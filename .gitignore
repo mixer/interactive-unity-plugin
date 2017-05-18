@@ -2,8 +2,8 @@ Source/InteractiveSDK/[Ll]ibrary/
 Source/InteractiveSDK/[Tt]emp/
 Source/InteractiveSDK/[Oo]bj/
 Source/InteractiveSDK/[Bb]uilds/
-Source/InteractiveSDK/StreamingAssets/
-Source/InteractiveSDK/Test/
+Source/InteractiveSDK/Assets/StreamingAssets*
+Source/InteractiveSDK/Assets/Test*
 Source/InteractiveSDK/UWP/
 Source/InteractiveSDK/ERA/
 Source/InteractiveSDK/Win32/
@@ -21,6 +21,7 @@ Source/InteractiveSDK/*.userprefs
 Source/InteractiveSDK/*.pidb
 Source/InteractiveSDK/*.booproj
 Source/InteractiveSDK/*.svd
+Source/InteractiveSDK/.vs
 
 
 # Unity3D generated meta files
@@ -35,7 +36,7 @@ Source/InteractiveSDK/*.unitypackage
 Source/InteractiveSDK/BuildPackage.log
 
 # We only want the .meta files for the libs which define which builds to include them in.
-Source/InteractiveSDK/Assets/Beam/Source/
+Source/InteractiveSDK/Assets/Beam.meta
 !Source/InteractiveSDK/Assets/Beam/Source/DLLs/*.meta
 !Source/InteractiveSDK/Assets/Beam/Source/DLLs/**/*.dll.meta
 
