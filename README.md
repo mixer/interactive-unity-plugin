@@ -1,12 +1,12 @@
 ## Welcome!
 
-The Microsoft Mixer Unity plugin enables game developers to access the Mixer interactive service.
+The Mixer Unity plugin enables game developers to access the Mixer interactive service.
 
 ## Contribute Back!
 
-Is there a feature missing that you'd like to see, or found a bug that you have a fix for? Or do you have an idea or just interest in helping out in building the library? Let us know and we'd love to work with you. For a good starting point on where we are headed and feature ideas, take a look at our [requested features and bugs](https://github.com/Microsoft/xbox-live-beam-api/issues).  
+Is there a feature missing that you'd like to see, or found a bug that you have a fix for? Or do you have an idea or just interest in helping out in building the library? Let us know and we'd love to work with you. For a good starting point on where we are headed and feature ideas, take a look at our [feedback and requested features](http://feedback.mixer.com/forums/382521-lazers-and-shiny-things).  
 
-Big or small we'd like to take your contributions back to help improve the Xbox Live Service API for everyone. 
+Big or small we'd like to take your contributions back to help improve the Mixer SDKs for everyone. 
 
 ## Having Trouble?
 
