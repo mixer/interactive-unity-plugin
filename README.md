@@ -1,6 +1,6 @@
 ## Welcome!
 
-The Microsoft Beam Unity plugin enables game developers to access the Beam interactive service.
+The Microsoft Mixer Unity plugin enables game developers to access the Mixer interactive service.
 
 ## Contribute Back!
 
@@ -10,11 +10,11 @@ Big or small we'd like to take your contributions back to help improve the Xbox 
 
 ## Having Trouble?
 
-We'd love to get your review score, whether good or bad, but even more than that, we want to fix your problem. If you submit your issue as a Review, we won't be able to respond to your problem and ask any follow-up questions that may be necessary. The most efficient way to do that is to open an issue in our [issue Tracker](https://github.com/WatchBeam/interactive-unity-plugin/issues).  
+We'd love to get your review score, whether good or bad, but even more than that, we want to fix your problem. If you submit your issue as a Review, we won't be able to respond to your problem and ask any follow-up questions that may be necessary. The most efficient way to do that is to open an issue in our [issue Tracker](https://github.com/Mixer/interactive-unity-plugin/issues).  
 
 ### Quick Links
 
-*   [Issue Tracker](https://github.com/WatchBeam/interactive-unity-plugin/issues)
+*   [Issue Tracker](https://github.com/Mixer/interactive-unity-plugin/issues)
 
 This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/). For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
 
