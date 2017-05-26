@@ -7,6 +7,6 @@ There are instructions included in each of the example scenes.
 
 You can learn more about the Mixer SDK at: https://dev.mixer.com/
 
-For bugs or other issues, you can find support at the official GIT repo: https://github.com/WatchBeam/interactive-unity-plugin/issues
+For bugs or other issues, you can find support at the official GIT repo: https://github.com/mixer/interactive-unity-plugin/issues
 
 For feedback, you can visit our feedback site: https://feedback.mixer.com/forums/382521-lazers-and-shiny-things
