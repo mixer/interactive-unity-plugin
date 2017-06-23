@@ -4,8 +4,11 @@ Source/InteractiveSDK/[Oo]bj/
 Source/InteractiveSDK/[Bb]uilds/
 Source/InteractiveSDK/Assets/StreamingAssets*
 Source/InteractiveSDK/Assets/Test*
-Source/InteractiveSDK/UWP/
-Source/InteractiveSDK/ERA/
+Source/InteractiveSDK/Debug/
+Source/InteractiveSDK/UWP-dotnet/
+Source/InteractiveSDK/UWP-IL2CPP/
+Source/InteractiveSDK/ERA-Mono2/
+Source/InteractiveSDK/ERA-IL2CPP/
 Source/InteractiveSDK/Win32/
 Source/InteractiveSDK/Assets/AssetStoreTools*
 
@@ -25,7 +28,7 @@ Source/InteractiveSDK/.vs
 
 
 # Unity3D generated meta files
-Source/InteractiveSDK/*.pidb.meta
+Source/InteractiveSDK/*.meta
 
 # Unity3D Generated File On Crash Reports
 Source/InteractiveSDK/sysinfo.txt
