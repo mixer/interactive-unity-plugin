@@ -9,9 +9,14 @@ PluginImporter:
   isPreloaded: 0
   isOverridable: 0
   platformData:
+    Android:
+      enabled: 0
+      settings:
+        CPU: ARMv7
     Any:
       enabled: 0
       settings:
+        Exclude Android: 1
         Exclude Editor: 1
         Exclude Linux: 1
         Exclude Linux64: 1
@@ -23,6 +28,7 @@ PluginImporter:
         Exclude Win64: 1
         Exclude WindowsStoreApps: 0
         Exclude XboxOne: 1
+        Exclude iOS: 1
     Editor:
       enabled: 0
       settings:
@@ -69,6 +75,11 @@ PluginImporter:
         PlaceholderPath: 
         SDK: AnySDK
         ScriptingBackend: AnyScriptingBackend
+    iOS:
+      enabled: 0
+      settings:
+        CompileFlags: 
+        FrameworkDependencies: 
   userData: 
   assetBundleName: 
   assetBundleVariant: 

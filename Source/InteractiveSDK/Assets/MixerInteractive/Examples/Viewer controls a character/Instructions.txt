@@ -14,8 +14,8 @@ Instructions
 7. Place the button on the grid.
 8. Click the save button.
 9. Go to the Code tab.
-10. Click the "developer lab" link.
-11. In the developer lab, click the "Manage OAuth" button.
+10. Click the "OAuth Clients" link.
+11. On the OAuth Clients page, click the "Create new client" button.
 12. Create a new OAuth client with the following information:
    * Name: "Test"
    * Website: "http://mixer.com"

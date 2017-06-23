@@ -76,7 +76,6 @@ public class InteractivityManagerEditor : Editor
         EditorGUILayout.LabelField("Groups", EditorStyles.boldLabel);
         EditorGUILayout.LabelField("Create new groups and specify which scene to show the group. Groups allow you to show different controls to different segments of the audience.", EditorStyles.wordWrappedLabel);
 
-        // HACKHACK - render 1st group control
         // Always render at least one group
         EditorGUILayout.BeginHorizontal();
         EditorGUILayout.LabelField("Group ID");

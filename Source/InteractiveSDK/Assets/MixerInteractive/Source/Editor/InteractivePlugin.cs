@@ -17,7 +17,7 @@ public static class MixerInteractivePlugin
     [MenuItem("Mixer/Documentation")]
     private static void ShowDocs()
     {
-        Application.OpenURL("https://dev.mixer.com/");
+        Application.OpenURL("https://github.com/mixer/interactive-unity-plugin/wiki");
     }
 
     [MenuItem("Mixer/Open Mixer Editor")]

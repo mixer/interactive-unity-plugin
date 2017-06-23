@@ -4,11 +4,13 @@ using System.IO;
 using UnityEditor;
 using UnityEngine;
 using Microsoft.Mixer;
+using Microsoft.Win32;
 
 public class InteractiveSettingsWindow : EditorWindow
 {
     private static string appID;
     private static string projectVersionID;
+    private static string shareCode;
     private static string mockAddcontrolID;
     public static Dictionary<string, Vector2> mockJoystickCoordinates;
     public static Dictionary<string, bool> mockIsIsSceneCurrent;
@@ -69,8 +71,9 @@ public class InteractiveSettingsWindow : EditorWindow
         existingProjectInformation = TryReadConfigFile();
         if (!existingProjectInformation)
         {
-            appID = "";
-            projectVersionID = "";
+            appID = string.Empty;
+            projectVersionID = string.Empty;
+            shareCode = string.Empty;
         }
 
         titleContent = new GUIContent("Interactive Editor");
@@ -161,15 +164,15 @@ public class InteractiveSettingsWindow : EditorWindow
         }
         if (GUILayout.Button("Save project information"))
         {
-            if (appID != string.Empty &&
-                projectVersionID != string.Empty)
+            if (!string.IsNullOrEmpty(appID) &&
+                !string.IsNullOrEmpty(projectVersionID))
             {
                 WriteConfigFile();
                 EditorUtility.DisplayDialog("Project information saved successfully", "This Unity game is now associated with your interactive project.", "Close");
             }
             else
             {
-                EditorUtility.DisplayDialog("Error: Could not save project information", "The OAuth Client ID and project Version ID cannot be empty.", "Close");
+                EditorUtility.DisplayDialog("Error: Could not save project information", "The OAuth Client ID and Project Version ID cannot be empty.", "Close");
             }
         }
 
@@ -220,7 +223,7 @@ public class InteractiveSettingsWindow : EditorWindow
             {
                 if (selectedControlIndex == CONTROL_DROPDOWN_BUTTON_INDEX)
                 {
-                    InteractivityManager.SingletonInstance.Buttons.Add(new InteractiveButtonControl(mockAddcontrolID, true, "", "", ""));
+                    InteractivityManager.SingletonInstance.Buttons.Add(new InteractiveButtonControl(mockAddcontrolID, true, "", 0, "", ""));
                 }
                 else if (selectedControlIndex == CONTROL_JOYSTICK_BUTTON_INDEX)
                 {
@@ -457,7 +460,39 @@ public class InteractiveSettingsWindow : EditorWindow
                 EditorPrefs.SetString("Mixer_LoggingLevel", newLoggingLevel);
             }
 
-            RenderApiExplorer();
+            SectionSeperator();
+
+            // Clear project information
+            EditorGUILayout.LabelField("Clear saved login information", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField("Clearing authentication tokens will delete any cached tokens. This is useful if you want to do testing with a new Mixer account.", EditorStyles.wordWrappedLabel);
+            if (GUILayout.Button("Clear saved login information"))
+            {
+                shareCode = string.Empty;
+                RemoveSavedLoginInformation();
+            }
+
+            SectionSeperator();
+
+            // Share code
+            EditorGUILayout.LabelField("Share Code", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField("Share Codes allow anyone running this game to access your interactive project. It is ideal for large game studios when you don't want to manually give each person access. You can get a short code from Interactive Studio by clicking the Manage Share Settings icon.", EditorStyles.wordWrappedLabel);
+            EditorGUILayout.BeginHorizontal();
+            shareCode = EditorGUILayout.TextField("Share Code", shareCode);
+            if (GUILayout.Button("Save"))
+            {
+                if (!string.IsNullOrEmpty(appID) &&
+                    !string.IsNullOrEmpty(projectVersionID) &&
+                    shareCode != null) // We allow an empty Share Code, because that allows the developer to clear the Share Code.
+                {
+                    WriteConfigFile();
+                    EditorUtility.DisplayDialog("Share Code saved successfully", "Anyone running this game will now have access to the interactive project.", "Close");
+                }
+                else
+                {
+                    EditorUtility.DisplayDialog("Error: Could not save project information", "The OAuth Client ID, Project Version ID and Share Code cannot be empty.", "Close");
+                }
+            }
+            EditorGUILayout.EndHorizontal();
         }
 
         EditorGUILayout.EndVertical();
@@ -513,6 +548,13 @@ public class InteractiveSettingsWindow : EditorWindow
                                         projectVersionID = jsonReader.Value.ToString();
                                     }
                                     break;
+                                case "sharecode":
+                                    jsonReader.Read();
+                                    if (jsonReader.Value != null)
+                                    {
+                                        shareCode = jsonReader.Value.ToString();
+                                    }
+                                    break;
                                 default:
                                     // No-op. We don't throw an error because the SDK only implements a
                                     // subset of the total possible server messages so we expect to see
@@ -543,7 +585,16 @@ public class InteractiveSettingsWindow : EditorWindow
             Directory.CreateDirectory(Application.streamingAssetsPath);
         }
         string fullPathToConfigFile = Application.streamingAssetsPath + "/" + CONFIG_FILE_NAME;
-        File.WriteAllText(fullPathToConfigFile, "{ \"AppID\": \"" + appID + "\", \"ProjectVersionID\":  \"" + projectVersionID + "\"}");
+        File.WriteAllText(fullPathToConfigFile, 
+            "{ \"AppID\": \"" + appID + "\", \"ProjectVersionID\": \"" + projectVersionID + "\", \"ShareCode\": \"" + shareCode + "\"}");
+    }
+
+    private void RemoveSavedLoginInformation()
+    {
+        RegistryKey key = Registry.CurrentUser.OpenSubKey("Software", true);
+        key.CreateSubKey("MixerInteractive");
+        key = key.OpenSubKey("MixerInteractive", true);
+        key.DeleteSubKey("Configuration");
     }
 
     private void MockReady()
@@ -564,51 +615,6 @@ public class InteractiveSettingsWindow : EditorWindow
         var participantLeaveMessage = participantLeaveMessageTemplate.Replace("{{UserName}}", userID);
         InteractivityManager.SingletonInstance.SendMockWebSocketMessage(participantLeaveMessage);
         InteractivityManager.SingletonInstance.DoWork();
-    }
-
-    // API Explorer
-    private Dictionary<string, bool> apiExpandGroupDetails;
-    private void RenderApiExplorer()
-    {
-        if (!Application.isPlaying)
-        {
-            return;
-        }
-
-        SectionSeperator();
-        showApiExplorer = EditorGUILayout.Foldout(showApiExplorer, "API Explorer", true, EditorStyles.foldout);
-        if (!showApiExplorer)
-        {
-            return;
-        }
-        else
-        {
-            // Groups
-            EditorGUILayout.LabelField("Mixer.Groups", EditorStyles.boldLabel);
-            foreach (InteractiveGroup group in MixerInteractive.Groups)
-            {
-                bool expanded;
-                var currentGroupID = group.GroupID;
-                if (!apiExpandGroupDetails.TryGetValue(currentGroupID, out expanded))
-                {
-                    apiExpandGroupDetails.Add(currentGroupID, expanded);
-                }
-                apiExpandGroupDetails[currentGroupID] = EditorGUILayout.Foldout(apiExpandGroupDetails[currentGroupID], currentGroupID);
-                if (apiExpandGroupDetails[currentGroupID])
-                {
-                    EditorGUILayout.LabelField("GroupID: " + group.GroupID);
-                    EditorGUILayout.LabelField("SceneID: " + group.SceneID);
-                }
-            }
-
-            // Scenes
-
-            // Participants
-
-            // Buttons
-
-            // Joysticks
-        }
     }
 
     // Helper classes

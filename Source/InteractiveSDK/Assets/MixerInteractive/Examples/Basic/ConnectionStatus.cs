@@ -26,5 +26,13 @@ namespace MixerInteractiveExamples
                 connectionStatus.text = "Success: Connected!";
             }
         }
+
+        void Update()
+        {
+            if (Input.GetButton("Fire1"))
+            {
+                MixerInteractive.GoInteractive();
+            }
+        }
     }
 }

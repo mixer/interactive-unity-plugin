@@ -4,11 +4,22 @@ using System.Net;
 using System.Net.Security;
 using UnityEngine;
 using Microsoft.Mixer;
-#if WINDOWS_UWP
+using UnityEngine.Networking;
+using System.Collections;
+#if UNITY_WSA && !UNITY_EDITOR
+using Windows.UI.Core;
+using Windows.ApplicationModel.Core;
 using System;
 using Windows.Security.Credentials;
 using Windows.Security.Authentication.Web.Core;
 using System.Threading.Tasks;
+#endif
+#if UNITY_XBOXONE && !UNITY_EDITOR
+using System;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.IO;
+using System.Collections;
 #endif
 
 public class MixerInteractive : MonoBehaviour
@@ -53,12 +64,21 @@ public class MixerInteractive : MonoBehaviour
     private static bool hasFiredGoInteractiveEvent;
     private static bool shouldCheckForOutstandingRequests;
 
-#if !WINDOWS_UWP
+#if UNITY_XBOXONE && !UNITY_EDITOR
+    private static bool startInitializationCoRoutine;
+#endif
+
+#if !UNITY_WSA || UNITY_EDITOR
     private static BackgroundWorker backgroundWorker;
 #endif
 
     private const string DEFAULT_GROUP_ID = "default";
     private const float CHECK_FOR_OUTSTANDING_REQUESTS_INTERVAL = 1f;
+
+    void Awake()
+    {
+        DontDestroyOnLoad(transform.gameObject);
+    }
 
     // Use this for initialization
     void Start()
@@ -120,7 +140,7 @@ public class MixerInteractive : MonoBehaviour
         outstandingRequestsCompleted = false;
         shouldCheckForOutstandingRequests = false;
         lastCheckForOutstandingRequestsTime = -1;
-#if !WINDOWS_UWP
+#if !UNITY_WSA
         backgroundWorker = new BackgroundWorker();
 #endif
         if (interactivityManagerAlreadyInitialized &&
@@ -300,7 +320,7 @@ public class MixerInteractive : MonoBehaviour
         {
             interactivityManager.OnInteractivityStateChanged -= HandleInteractivityStateChangedInternal;
 
-#if !WINDOWS_UWP
+#if !UNITY_WSA && !UNITY_EDITOR
             // Run initialization in another thread.
             backgroundWorker.DoWork -= BackgroundWorkerDoWork;
 #endif
@@ -339,6 +359,14 @@ public class MixerInteractive : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+#if UNITY_XBOXONE && !UNITY_EDITOR
+        if (startInitializationCoRoutine)
+        {
+            startInitializationCoRoutine = false;
+            StartCoroutine(InitializeCoRoutine());
+        }
+#endif
+
         if (processedSerializedProperties &&
             shouldCheckForOutstandingRequests &&
             !outstandingRequestsCompleted &&
@@ -563,6 +591,23 @@ public class MixerInteractive : MonoBehaviour
         return InteractivityManager.SingletonInstance.GetScene(sceneID);
     }
 
+    private IEnumerator InitializeCoRoutine()
+    {
+        using (UnityWebRequest request = UnityWebRequest.Get("https://beam.pro/api/v1/interactive/hosts"))
+        {
+            yield return request.Send();
+            if (request.isError)
+            {
+                Debug.Log("Error: Could not retrieve websocket URL. " + request.error);
+            }
+            else // Success
+            {
+                string websocketHostsJson = request.downloadHandler.text;
+                InteractivityManager.SingletonInstance.Initialize(true, "", websocketHostsJson);
+            }
+        }
+    }
+
     /// <summary>
     /// Connects to the interactivity service and signals the service that the InteractivityManager is ready to recieve messages.
     /// It also, handles signals authentication events if necessary.
@@ -582,7 +627,11 @@ public class MixerInteractive : MonoBehaviour
         interactivityManager.OnInteractivityStateChanged -= HandleInteractivityStateChangedInternal;
         interactivityManager.OnInteractivityStateChanged += HandleInteractivityStateChangedInternal;
 
-#if !WINDOWS_UWP
+#if UNITY_XBOXONE && !UNITY_EDITOR
+        startInitializationCoRoutine = true;
+#elif UNITY_WSA && !UNITY_EDITOR
+        InitializeAsync();
+#else
         // Run initialization in another thread.
         // Workaround - in certain cases Unity does not call the Start function, which means
         // initialization does not happen. We need to check if the background worker hasn't
@@ -594,8 +643,6 @@ public class MixerInteractive : MonoBehaviour
         backgroundWorker.DoWork -= BackgroundWorkerDoWork;
         backgroundWorker.DoWork += BackgroundWorkerDoWork;
         backgroundWorker.RunWorkerAsync();
-#else
-        InitializeAsync();
 #endif
 
         if (MixerInteractiveHelper.SingletonInstance.runInBackgroundIfInteractive)
@@ -608,8 +655,11 @@ public class MixerInteractive : MonoBehaviour
 #if WINDOWS_UWP
     private static async void InitializeAsync()
     {
-        await Task.Run(() => {
-            InteractivityManager.SingletonInstance.Initialize(true);
+        // Try to get an XToken. If not, fall back to using a short code.
+        string token = await GetXTokenAsync();
+        await Task.Run(() =>
+        {
+            InteractivityManager.SingletonInstance.Initialize(true, token);
         });
     }
 #endif
@@ -727,51 +777,84 @@ public class MixerInteractive : MonoBehaviour
     private static async Task<string> GetXTokenAsync()
     {
         string token = string.Empty;
-        // Get an XToken
-        // Find the account provider using the signed in user.
-        // We always use the 1st signed in user, because we just need a valid token. It doesn't
-        // matter who's it is.
-        Windows.System.User currentUser;
-        WebTokenRequest request;
-        var users = await Windows.System.User.FindAllAsync();
-        currentUser = users[0];
-        WebAccountProvider xboxProvider = await WebAuthenticationCoreManager.FindAccountProviderAsync("https://xsts.auth.xboxlive.com", "", currentUser);
 
-        // Build the web token request using the account provider.
-        // Url = URL of the service we are getting a token for - for example https://apis.mycompany.com/something. 
-        // As this is a sample just use xboxlive.com
-        // Target & Policy should always be set to "xboxlive.signin" and "DELEGATION"
-        // For this call to succeed your console needs to be in the XDKS.1 sandbox
-        request = new Windows.Security.Authentication.Web.Core.WebTokenRequest(xboxProvider);
-        request.Properties.Add("Url", "https://xboxlive.com");
-        request.Properties.Add("Target", "xboxlive.signin");
-        request.Properties.Add("Policy", "DELEGATION");
+        TaskCompletionSource<string> getTokenTaskCompletionSource = new TaskCompletionSource<string>();
+        Task<string> getTokenTask = getTokenTaskCompletionSource.Task;
 
-        // Request a token - correct pattern is to call getTokenSilentlyAsync and if that 
-        // fails with WebTokenRequestStatus.userInteractionRequired then call requestTokenAsync
-        // to get the token and prompt the user if required.
-        // getTokenSilentlyAsync can be called on a background thread.
-        WebTokenRequestResult tokenResult = await WebAuthenticationCoreManager.GetTokenSilentlyAsync(request);
-        //If we got back a token call our service with that token 
-        if (tokenResult.ResponseStatus == WebTokenRequestStatus.Success)
+        try
         {
-            token = tokenResult.ResponseData[0].Token;
-        }
-        else if (tokenResult.ResponseStatus == WebTokenRequestStatus.UserInteractionRequired)
-        { // WebTokenRequestStatus.userInteractionRequired = 3
-          // If user interaction is required then call requestTokenAsync instead - this will prompt for user permission if required
-          // Note: RequestTokenAsync cannot be called on a background thread.
-            WebTokenRequestResult tokenResult2 = await WebAuthenticationCoreManager.RequestTokenAsync(request);
-            //If we got back a token call our service with that token 
-            if (tokenResult2.ResponseStatus == WebTokenRequestStatus.Success)
+            await CoreApplication.MainView.CoreWindow.Dispatcher.RunAsync(CoreDispatcherPriority.Normal, async () =>
             {
-                token = tokenResult.ResponseData[0].Token;
-            }
-            else if (tokenResult2.ResponseStatus == WebTokenRequestStatus.UserCancel)
-            { 
-                // No-op
-            }
+                // Get an XToken
+                // Find the account provider using the signed in user.
+                // We always use the 1st signed in user, because we just need a valid token. It doesn't
+                // matter who's it is.
+                Windows.System.User currentUser;
+                WebTokenRequest request;
+                var users = await Windows.System.User.FindAllAsync();
+                if (users.Count > 0)
+                {
+                    currentUser = users[0];
+                    WebAccountProvider xboxProvider = await WebAuthenticationCoreManager.FindAccountProviderAsync("https://xsts.auth.xboxlive.com", "", currentUser);
+
+                    // Build the web token request using the account provider.
+                    // Url = URL of the service we are getting a token for - for example https://apis.mycompany.com/something. 
+                    // As this is a sample just use xboxlive.com
+                    // Target & Policy should always be set to "xboxlive.signin" and "DELEGATION"
+                    // For this call to succeed your console needs to be in the XDKS.1 sandbox
+                    request = new Windows.Security.Authentication.Web.Core.WebTokenRequest(xboxProvider);
+                    request.Properties.Add("Url", "https://mixer.com");
+                    request.Properties.Add("Target", "xboxlive.signin");
+                    request.Properties.Add("Policy", "DELEGATION");
+
+                    // Request a token - correct pattern is to call getTokenSilentlyAsync and if that 
+                    // fails with WebTokenRequestStatus.userInteractionRequired then call requestTokenAsync
+                    // to get the token and prompt the user if required.
+                    // getTokenSilentlyAsync can be called on a background thread.
+                    WebTokenRequestResult tokenResult = await WebAuthenticationCoreManager.GetTokenSilentlyAsync(request);
+                    //If we got back a token call our service with that token 
+                    if (tokenResult.ResponseStatus == WebTokenRequestStatus.Success)
+                    {
+                        token = tokenResult.ResponseData[0].Token;
+                    }
+                    else if (tokenResult.ResponseStatus == WebTokenRequestStatus.UserInteractionRequired)
+                    { // WebTokenRequestStatus.userInteractionRequired = 3
+                      // If user interaction is required then call requestTokenAsync instead - this will prompt for user permission if required
+                      // Note: RequestTokenAsync cannot be called on a background thread.
+                        WebTokenRequestResult tokenResult2 = await WebAuthenticationCoreManager.RequestTokenAsync(request);
+                        //If we got back a token call our service with that token
+                        string tokenResultString = tokenResult2.ResponseStatus.ToString();
+                        if (tokenResult2.ResponseStatus == WebTokenRequestStatus.Success)
+                        {
+                            token = tokenResult.ResponseData[0].Token;
+                        }
+                        else if (tokenResult2.ResponseStatus == WebTokenRequestStatus.UserCancel)
+                        {
+                            Debug.Log("Error: Unable to get an XToken, the user denied this app access to get an XToken.");
+                        }
+                        else if (tokenResult2.ResponseStatus == WebTokenRequestStatus.ProviderError)
+                        {
+                            Debug.Log("Error: Unable to get an XToken, please check the IDs for this game.");
+                        }
+                    }
+                    else if (tokenResult.ResponseStatus == WebTokenRequestStatus.ProviderError)
+                    {
+                        Debug.Log("Error: Unable to get an XToken, please check the IDs for this game.");
+                    }
+                    getTokenTaskCompletionSource.SetResult(token);
+                }
+                else
+                {
+                    Debug.Log("Error: No users signed in.");
+                }
+            });
         }
+        catch (Exception ex)
+        {
+            Debug.Log("Error: Unexpected error retrieving an XToken. Exception details: " + ex.Message);
+        }
+
+        token = getTokenTask.Result;
         return token;
     }
 #endif
