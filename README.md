@@ -1,10 +1,10 @@
 ## Welcome!
 
-The Mixer Unity plugin enables game developers to access the Mixer interactive service.
+The Mixer Unity plugin helps you add features to your game that let the audience interact with people streaming your game!
 
 ## Having Trouble?
 
-We'd love to get your review score, whether good or bad, but even more than that, we want to fix your problem. If you submit your issue as a Review, we won't be able to respond to your problem and ask any follow-up questions that may be necessary. The most efficient way to do that is to open an issue in our [issue Tracker](https://github.com/Mixer/interactive-unity-plugin/issues).  
+We want to help you fix your problem. The most efficient way to do that is to open an issue in our [issue Tracker](https://github.com/Mixer/interactive-unity-plugin/issues).  
 
 ### Quick Links
 
