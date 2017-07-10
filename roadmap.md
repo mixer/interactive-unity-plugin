@@ -15,6 +15,6 @@
 - [X] Windows Standalone
 - [ ] Mac Standalone
 - [X] Windows Store Apps
-- [X] ERA Games
+- [X] Xbox One Games (non UWP)
 - [ ] iOS (IL2CPP only)
 - [ ] Android
