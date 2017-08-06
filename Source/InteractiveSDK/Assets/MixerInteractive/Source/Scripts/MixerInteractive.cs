@@ -52,6 +52,7 @@ public class MixerInteractive : MonoBehaviour
     public static event OnInteractiveJoystickControlEventHandler OnInteractiveJoystickControlEvent;
 
     public delegate void OnInteractiveMessageEventHandler(object sender, InteractiveMessageEventArgs e);
+    public static event OnInteractiveMessageEventHandler OnInteractiveMessageEvent;
 
     private static InteractivityManager interactivityManager;
     private static List<InteractiveEventArgs> queuedEvents;
@@ -116,6 +117,7 @@ public class MixerInteractive : MonoBehaviour
             interactivityManager.OnParticipantStateChanged += HandleParticipantStateChanged;
             interactivityManager.OnInteractiveButtonEvent += HandleInteractiveButtonEvent;
             interactivityManager.OnInteractiveJoystickControlEvent += HandleInteractiveJoystickControlEvent;
+            interactivityManager.OnInteractiveMessageEvent += HandleInteractiveMessageEvent;
         }
         else
         {
@@ -174,6 +176,11 @@ public class MixerInteractive : MonoBehaviour
     }
 
     private static void HandleError(object sender, InteractiveEventArgs e)
+    {
+        queuedEvents.Add(e);
+    }
+
+    private static void HandleInteractiveMessageEvent(object sender, InteractiveEventArgs e)
     {
         queuedEvents.Add(e);
     }
@@ -443,6 +450,11 @@ public class MixerInteractive : MonoBehaviour
                         processedEvents.Add(interactiveEvent);
                         break;
                     default:
+                        if (OnInteractiveMessageEvent != null)
+                        {
+                            OnInteractiveMessageEvent(this, interactiveEvent as InteractiveMessageEventArgs);
+                        }
+                        processedEvents.Add(interactiveEvent);
                         break;
                 }
             }
@@ -591,6 +603,25 @@ public class MixerInteractive : MonoBehaviour
     public static InteractiveScene GetScene(string sceneID)
     {
         return InteractivityManager.SingletonInstance.GetScene(sceneID);
+    }
+
+    /// <summary>
+    /// Sends a custom message. The format must be JSON.
+    /// </summary>
+    /// <param name="message">The message to send.</param>
+    public static void SendInteractiveMessage(string message)
+    {
+        InteractivityManager.SingletonInstance.SendMessage(message);
+    }
+
+    /// <summary>
+    /// Sends a custom message. The message will be formatted as JSON automatically.
+    /// </summary>
+    /// <param name="messageType">The name of this type of message.</param>
+    /// <param name="parameters">A collection of name / value pairs.</param>
+    public static void SendInteractiveMessage(string messageType, Dictionary<string, object> parameters)
+    {
+        InteractivityManager.SingletonInstance.SendMessage(messageType, parameters);
     }
 
     private IEnumerator InitializeCoRoutine()
@@ -864,5 +895,10 @@ public class MixerInteractive : MonoBehaviour
     void OnDestroy()
     {
         ResetInternalState();
+    }
+
+    void OnApplicationQuit()
+    {
+        StopInteractive();
     }
 }
