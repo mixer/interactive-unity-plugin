@@ -5,7 +5,7 @@
 - [X] Input by participant
 - [X] Get participants
 - [X] Groups
-- [ ] Sparks
+- [X] Sparks
 - [ ] Custom controls
 - [ ] Service side input aggregation
 
@@ -14,7 +14,7 @@
 - [ ] Unity Editor on Mac
 - [X] Windows Standalone
 - [ ] Mac Standalone
-- [ ] Windows Store Apps
-- [ ] ERA Games
+- [X] Windows Store Apps (including Xbox One UWPs)
+- [X] Xbox One Games (non UWP)
 - [ ] iOS (IL2CPP only)
 - [ ] Android

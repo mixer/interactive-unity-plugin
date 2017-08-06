@@ -1,16 +1,10 @@
 ## Welcome!
 
-The Mixer Unity plugin enables game developers to access the Mixer interactive service.
-
-## Contribute Back!
-
-Is there a feature missing that you'd like to see, or found a bug that you have a fix for? Or do you have an idea or just interest in helping out in building the library? Let us know and we'd love to work with you. For a good starting point on where we are headed and feature ideas, take a look at our [feedback and requested features](http://feedback.mixer.com/forums/382521-lazers-and-shiny-things).  
-
-Big or small we'd like to take your contributions back to help improve the Mixer SDKs for everyone. 
+The Mixer Unity plugin helps you add features to your game that let the audience interact with people streaming your game!
 
 ## Having Trouble?
 
-We'd love to get your review score, whether good or bad, but even more than that, we want to fix your problem. If you submit your issue as a Review, we won't be able to respond to your problem and ask any follow-up questions that may be necessary. The most efficient way to do that is to open an issue in our [issue Tracker](https://github.com/Mixer/interactive-unity-plugin/issues).  
+We want to help you fix your problem. The most efficient way to do that is to open an issue in our [issue Tracker](https://github.com/Mixer/interactive-unity-plugin/issues).  
 
 ### Quick Links
 
