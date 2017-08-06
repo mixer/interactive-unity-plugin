@@ -98,7 +98,7 @@ namespace Microsoft.Mixer
             return null;
         }
 
-        public void Initialize(bool goInteractive = true)
+        public void Initialize(bool goInteractive = true, string token = "", string additionalJson = "")
         {
         }
 

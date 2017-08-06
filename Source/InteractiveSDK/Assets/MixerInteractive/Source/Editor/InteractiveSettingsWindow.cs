@@ -121,7 +121,8 @@ public class InteractiveSettingsWindow : EditorWindow
                 break;
         };
         scrollPos = new Vector2();
-        EditorApplication.playmodeStateChanged = HandlePlayModeStateChanged;
+        EditorApplication.playmodeStateChanged -= HandlePlayModeStateChanged;
+        EditorApplication.playmodeStateChanged += HandlePlayModeStateChanged;
     }
 
     void OnGUI()

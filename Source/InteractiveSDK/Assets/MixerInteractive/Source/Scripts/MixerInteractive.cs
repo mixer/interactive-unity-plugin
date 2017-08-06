@@ -51,6 +51,8 @@ public class MixerInteractive : MonoBehaviour
     public delegate void OnInteractiveJoystickControlEventHandler(object sender, InteractiveJoystickEventArgs e);
     public static event OnInteractiveJoystickControlEventHandler OnInteractiveJoystickControlEvent;
 
+    public delegate void OnInteractiveMessageEventHandler(object sender, InteractiveMessageEventArgs e);
+
     private static InteractivityManager interactivityManager;
     private static List<InteractiveEventArgs> queuedEvents;
     private static bool previousRunInBackgroundValue;
@@ -107,6 +109,7 @@ public class MixerInteractive : MonoBehaviour
             interactivityManager.OnParticipantStateChanged -= HandleParticipantStateChanged;
             interactivityManager.OnInteractiveButtonEvent -= HandleInteractiveButtonEvent;
             interactivityManager.OnInteractiveJoystickControlEvent -= HandleInteractiveJoystickControlEvent;
+            interactivityManager.OnInteractiveMessageEvent -= HandleInteractiveMessageEvent;
 
             interactivityManager.OnError += HandleError;
             interactivityManager.OnInteractivityStateChanged += HandleInteractivityStateChanged;
@@ -440,7 +443,6 @@ public class MixerInteractive : MonoBehaviour
                         processedEvents.Add(interactiveEvent);
                         break;
                     default:
-                        // Throw exception for unexpected event type.
                         break;
                 }
             }
