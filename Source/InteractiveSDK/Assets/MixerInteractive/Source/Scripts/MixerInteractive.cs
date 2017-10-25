@@ -704,10 +704,19 @@ public class MixerInteractive : MonoBehaviour
 
     private static void HandleInteractivityStateChangedInternal(object sender, InteractivityStateChangedEventArgs e)
     {
+        if (e == null)
+        {
+            return;
+        }
+
         var state = e.State;
         switch (state)
         {
             case InteractivityState.ShortCodeRequired:
+                if (!mixerDialog.gameObject.activeInHierarchy)
+                {
+                    mixerDialog.gameObject.SetActive(true);
+                }
                 mixerDialog.Show(InteractivityManager.SingletonInstance.ShortCode);
                 break;
             case InteractivityState.InteractivityEnabled:

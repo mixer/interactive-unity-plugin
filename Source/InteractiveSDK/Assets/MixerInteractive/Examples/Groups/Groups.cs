@@ -9,7 +9,6 @@ namespace MixerInteractiveExamples
 
         public Text group1Text;
         public Text group2Text;
-        public Text group3Text;
 
         // Use this for initialization
         void Start()
@@ -28,25 +27,16 @@ namespace MixerInteractiveExamples
             if (participant.State == InteractiveParticipantState.Joined &&
                 MixerInteractive.Groups.Count >= 2)
             {
-                InteractiveGroup group1 = MixerInteractive.Groups[0];
-                InteractiveGroup group2 = MixerInteractive.Groups[1];
-                InteractiveGroup group3 = MixerInteractive.Groups[2];
-
-                int group = Mathf.CeilToInt(Random.value * 3);
+                int group = Mathf.CeilToInt(Random.value * 2);
                 if (group == 1)
                 {
-                    participant.Group = group1;
+                    participant.Group = MixerInteractive.GetGroup("Group1");
                     group1Text.text += "\n" + participant.UserName;
                 }
-                else if (group == 2)
+                else
                 {
-                    participant.Group = group2;
+                    participant.Group = MixerInteractive.GetGroup("Group2");
                     group2Text.text += "\n" + participant.UserName;
-                }
-                else if (group == 3)
-                {
-                    participant.Group = group3;
-                    group3Text.text += "\n" + participant.UserName;
                 }
             }
         }

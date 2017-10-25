@@ -1,6 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.UI;
 
 public class MixerInteractiveDialog : MonoBehaviour {
@@ -15,7 +13,8 @@ public class MixerInteractiveDialog : MonoBehaviour {
 	
 	// Update is called once per frame
 	void Update () {
-        if (Input.GetButton("Cancel"))
+        if (_dialogCanvas != null &&
+            _dialogCanvas.enabled && Input.GetButton("Cancel"))
         {
             Hide();
         }
@@ -24,12 +23,18 @@ public class MixerInteractiveDialog : MonoBehaviour {
     public void Show(string shortCode)
     {
         RefreshShortCode(shortCode);
-        _dialogCanvas.enabled = true;
+        if (_dialogCanvas != null)
+        {
+            _dialogCanvas.enabled = true;
+        }
     }
 
     public void Hide()
     {
-        _dialogCanvas.enabled = false;
+        if (_dialogCanvas != null)
+        {
+            _dialogCanvas.enabled = false;
+        }
     }
 
     private void RefreshShortCode(string shortCode)
