@@ -595,7 +595,9 @@ public class InteractiveSettingsWindow : EditorWindow
         RegistryKey key = Registry.CurrentUser.OpenSubKey("Software", true);
         key.CreateSubKey("MixerInteractive");
         key = key.OpenSubKey("MixerInteractive", true);
-        key.DeleteSubKey("Configuration");
+        key.CreateSubKey("Configuration");
+        key = key.OpenSubKey("Configuration", true);
+        key.DeleteSubKey(appID + "-" + projectVersionID);
     }
 
     private void MockReady()

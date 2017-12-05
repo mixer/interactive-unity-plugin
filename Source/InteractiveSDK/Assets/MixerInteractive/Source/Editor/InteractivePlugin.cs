@@ -11,7 +11,7 @@ public static class MixerInteractivePlugin
     [MenuItem("Mixer/Interactive Studio")]
     private static void InteractiveStudio()
     {
-        Application.OpenURL("https://mixer.com/i/studio");
+        Application.OpenURL("https://mixer.com/lab/interactive");
     }
 
     [MenuItem("Mixer/Documentation")]

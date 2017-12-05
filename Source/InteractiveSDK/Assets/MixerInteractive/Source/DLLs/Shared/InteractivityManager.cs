@@ -1013,6 +1013,8 @@ namespace Microsoft.Mixer
             key = key.OpenSubKey("MixerInteractive", true);
             key.CreateSubKey("Configuration");
             key = key.OpenSubKey("Configuration", true);
+            key.CreateSubKey(AppID + "-" + ProjectVersionID);
+            key = key.OpenSubKey(AppID + "-" + ProjectVersionID, true);
             _authToken = key.GetValue("MixerInteractive-AuthToken") as string;
             _oauthRefreshToken = key.GetValue("MixerInteractive-RefreshToken") as string;
 #elif UNITY_WSA
@@ -1042,6 +1044,8 @@ namespace Microsoft.Mixer
             key = key.OpenSubKey("MixerInteractive", true);
             key.CreateSubKey("Configuration");
             key = key.OpenSubKey("Configuration", true);
+            key.CreateSubKey(AppID + "-" + ProjectVersionID);
+            key = key.OpenSubKey(AppID + "-" + ProjectVersionID, true);
             key.SetValue("MixerInteractive-AuthToken", _authToken);
             key.SetValue("MixerInteractive-RefreshToken", _oauthRefreshToken);
 #elif UNITY_WSA
