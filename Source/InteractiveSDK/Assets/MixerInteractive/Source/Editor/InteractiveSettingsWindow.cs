@@ -99,7 +99,7 @@ public class InteractiveSettingsWindow : EditorWindow
            };
 
         InteractivityManager.useMockData = true;
-        string loggingLevel = EditorPrefs.GetString("Interactive_LoggingLevel");
+        string loggingLevel = EditorPrefs.GetString("MixerInteractive_LoggingLevel");
         loggingLevelSelectIndex = 0;
         switch (loggingLevel)
         {
@@ -458,7 +458,7 @@ public class InteractiveSettingsWindow : EditorWindow
                     default:
                         break;
                 }
-                EditorPrefs.SetString("Mixer_LoggingLevel", newLoggingLevel);
+                EditorPrefs.SetString("MixerInteractive_LoggingLevel", newLoggingLevel);
             }
 
             SectionSeperator();
