@@ -1,6 +1,9 @@
 #  Ignore Everything
 *
 
+# Allow into the tree
+!*/
+
 # But not these files...
 !.gitignore
 !CONTRIBUTING.md
@@ -8,6 +11,7 @@
 !README.md
 !roadmap.md
 !unreal-studio-new-oauth.png
-!documentation/*
-!Source/InteractiveSDK/Assets/MixerInteractive/*
-!Source/InteractiveSDK/Assets/ProjectSettings/*
+!documentation/**/*
+!Source/InteractiveSDK/Assets/MixerInteractive/**
+!Source/InteractiveSDK/Assets/ProjectSettings/**
+
