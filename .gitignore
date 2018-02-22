@@ -13,5 +13,5 @@
 !unreal-studio-new-oauth.png
 !documentation/**/*
 !Source/InteractiveSDK/Assets/MixerInteractive/**
-!Source/InteractiveSDK/Assets/ProjectSettings/**
+!Source/InteractiveSDK/ProjectSettings/**
 
