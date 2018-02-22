@@ -6,16 +6,16 @@ using UnityEngine;
 using Microsoft.Mixer;
 using UnityEngine.Networking;
 using System.Collections;
+using System;
+using Microsoft;
 #if UNITY_WSA && !UNITY_EDITOR
 using Windows.UI.Core;
 using Windows.ApplicationModel.Core;
-using System;
 using Windows.Security.Credentials;
 using Windows.Security.Authentication.Web.Core;
 using System.Threading.Tasks;
 #endif
 #if UNITY_XBOXONE && !UNITY_EDITOR
-using System;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.IO;
@@ -67,9 +67,7 @@ public class MixerInteractive : MonoBehaviour
     private static bool hasFiredGoInteractiveEvent;
     private static bool shouldCheckForOutstandingRequests;
 
-#if UNITY_XBOXONE && !UNITY_EDITOR
-    private static bool startInitializationCoRoutine;
-#endif
+    internal static Websocket websocket;
 
 #if !UNITY_WSA || UNITY_EDITOR
     private static BackgroundWorker backgroundWorker;
@@ -81,6 +79,9 @@ public class MixerInteractive : MonoBehaviour
     void Awake()
     {
         DontDestroyOnLoad(transform.gameObject);
+        // Make sure the MixerInteractiveHelper is initialized. Old game projects won't have the MixerInteractiveHelper
+        // on the InteractivityManager prefab. Since we don't want to break them, we add it under the covers.
+        gameObject.AddComponent<MixerInteractiveHelper>();
     }
 
     // Use this for initialization
@@ -153,6 +154,8 @@ public class MixerInteractive : MonoBehaviour
         {
             ProcessSerializedProperties();
         }
+        websocket = gameObject.AddComponent<Websocket>();
+        InteractivityManager.SingletonInstance.SetWebsocketInstance(websocket);
     }
 
     private static void HandleInteractiveJoystickControlEvent(object sender, InteractiveJoystickEventArgs e)
@@ -369,14 +372,6 @@ public class MixerInteractive : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-#if UNITY_XBOXONE && !UNITY_EDITOR
-        if (startInitializationCoRoutine)
-        {
-            startInitializationCoRoutine = false;
-            StartCoroutine(InitializeCoRoutine());
-        }
-#endif
-
         if (processedSerializedProperties &&
             shouldCheckForOutstandingRequests &&
             !outstandingRequestsCompleted &&
@@ -629,14 +624,14 @@ public class MixerInteractive : MonoBehaviour
         using (UnityWebRequest request = UnityWebRequest.Get("https://beam.pro/api/v1/interactive/hosts"))
         {
             yield return request.Send();
-            if (request.isError)
+            if (request.isNetworkError)
             {
                 Debug.Log("Error: Could not retrieve websocket URL. " + request.error);
             }
             else // Success
             {
                 string websocketHostsJson = request.downloadHandler.text;
-                InteractivityManager.SingletonInstance.Initialize(true, "", websocketHostsJson);
+                InteractivityManager.SingletonInstance.Initialize(true, null);
             }
         }
     }
@@ -660,9 +655,7 @@ public class MixerInteractive : MonoBehaviour
         interactivityManager.OnInteractivityStateChanged -= HandleInteractivityStateChangedInternal;
         interactivityManager.OnInteractivityStateChanged += HandleInteractivityStateChangedInternal;
 
-#if UNITY_XBOXONE && !UNITY_EDITOR
-        startInitializationCoRoutine = true;
-#elif UNITY_WSA && !UNITY_EDITOR
+#if UNITY_WSA && !UNITY_EDITOR
         InitializeAsync();
 #else
         // Run initialization in another thread.
@@ -688,11 +681,9 @@ public class MixerInteractive : MonoBehaviour
 #if WINDOWS_UWP
     private static async void InitializeAsync()
     {
-        // Try to get an XToken. If not, fall back to using a short code.
-        string token = await GetXTokenAsync();
         await Task.Run(() =>
         {
-            InteractivityManager.SingletonInstance.Initialize(true, token);
+            InteractivityManager.SingletonInstance.Initialize(true);
         });
     }
 #endif

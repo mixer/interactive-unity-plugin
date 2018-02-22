@@ -27,6 +27,8 @@ public class InteractiveSettingsWindow : EditorWindow
     LoggingLevel currentLogLevel;
     private Vector2 scrollPos;
     private static bool showApiExplorer;
+    private static bool wasPaused;
+    private static bool initialized;
 
     // Control indexes
     private static int CONTROL_DROPDOWN_BUTTON_INDEX = 0;
@@ -39,7 +41,6 @@ public class InteractiveSettingsWindow : EditorWindow
     // Use this for initialization
     void Start()
     {
-        Initialize();
     }
 
     void HandlePlayModeStateChanged()
@@ -48,6 +49,13 @@ public class InteractiveSettingsWindow : EditorWindow
         {
             sendMockReadyOnChangeToPlayMode = false;
             InteractivityManager.SingletonInstance.OnInteractivityStateChanged += OnInteractivityStateChanged;
+        }
+        // The following is equivalent to the case of exiting play mode.
+        else if (!EditorApplication.isPaused &&
+            EditorApplication.isPlaying && 
+            !EditorApplication.isPlayingOrWillChangePlaymode)
+        {
+            InteractivityManager.SingletonInstance.Dispose();
         }
     }
 
@@ -99,7 +107,7 @@ public class InteractiveSettingsWindow : EditorWindow
            };
 
         InteractivityManager.useMockData = true;
-        string loggingLevel = EditorPrefs.GetString("MixerInteractive_LoggingLevel");
+        string loggingLevel = EditorPrefs.GetString("Interactive_LoggingLevel");
         loggingLevelSelectIndex = 0;
         switch (loggingLevel)
         {
@@ -123,11 +131,13 @@ public class InteractiveSettingsWindow : EditorWindow
         scrollPos = new Vector2();
         EditorApplication.playmodeStateChanged -= HandlePlayModeStateChanged;
         EditorApplication.playmodeStateChanged += HandlePlayModeStateChanged;
+
+        initialized = true;
     }
 
     void OnGUI()
     {
-        if (mockAddcontrolID == null)
+        if (!initialized)
         {
             Initialize();
         }
@@ -458,7 +468,7 @@ public class InteractiveSettingsWindow : EditorWindow
                     default:
                         break;
                 }
-                EditorPrefs.SetString("MixerInteractive_LoggingLevel", newLoggingLevel);
+                EditorPrefs.SetString("Mixer_LoggingLevel", newLoggingLevel);
             }
 
             SectionSeperator();
@@ -597,7 +607,11 @@ public class InteractiveSettingsWindow : EditorWindow
         key = key.OpenSubKey("MixerInteractive", true);
         key.CreateSubKey("Configuration");
         key = key.OpenSubKey("Configuration", true);
-        key.DeleteSubKey(appID + "-" + projectVersionID);
+        RegistryKey subKey = key.OpenSubKey(appID + "-" + projectVersionID, true);
+        if (subKey != null)
+        {
+            key.DeleteSubKey(appID + "-" + projectVersionID);
+        }
     }
 
     private void MockReady()
