@@ -643,11 +643,20 @@ public class MixerInteractive : MonoBehaviour
         InteractivityManager.SingletonInstance.SendMessage(messageType, parameters);
     }
 
+    /// <summary>
+    /// Removes cached login information. This function removes saved project IDs and cached tokens.
+    /// This is useful if you have multiple users switching between accounts on the same machine.
+    /// </summary>
+    public static void ClearSavedLoginInformation()
+    {
+        InteractivityManager.SingletonInstance.RemoveAuthTokensFromCache();
+    }
+
     private IEnumerator InitializeCoRoutine()
     {
         using (UnityWebRequest request = UnityWebRequest.Get("https://beam.pro/api/v1/interactive/hosts"))
         {
-            yield return request.Send();
+            yield return request.SendWebRequest();
             if (request.isNetworkError)
             {
                 Debug.Log("Error: Could not retrieve websocket URL. " + request.error);

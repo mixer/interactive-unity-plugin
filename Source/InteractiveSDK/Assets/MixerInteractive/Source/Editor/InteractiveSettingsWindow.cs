@@ -22,32 +22,21 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
+using Microsoft.Mixer;
 using Newtonsoft.Json;
-using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
-using Microsoft.Mixer;
-using Microsoft.Win32;
 
 public class InteractiveSettingsWindow : EditorWindow
 {
     private static string appID;
     private static string projectVersionID;
     private static string shareCode;
-    private static string mockAddcontrolID;
-    public static Dictionary<string, Vector2> mockJoystickCoordinates;
-    public static Dictionary<string, bool> mockIsIsSceneCurrent;
-    private static string mockParticipantJoinUsername;
-    private static string mockNewSceneSceneID;
     private static int selectedControlIndex;
     private static int loggingLevelSelectIndex;
-    private static bool showAdvancedOptions;
-    private static bool mockIsInteractive = false;
-    public static Dictionary<string, bool> expandControlDetails;
     private const string CONFIG_FILE_NAME = "interactiveconfig.json";
     private bool shouldSwitchToRunInBackground = false;
-    private bool sendMockReadyOnChangeToPlayMode = false;
     LoggingLevel currentLogLevel;
     private Vector2 scrollPos;
     private static bool showApiExplorer;
@@ -67,33 +56,14 @@ public class InteractiveSettingsWindow : EditorWindow
     {
     }
 
-    void HandlePlayModeStateChanged()
+    void HandlePlayModeStateChanged(PlayModeStateChange args)
     {
-        if (EditorApplication.isPlaying && sendMockReadyOnChangeToPlayMode)
-        {
-            sendMockReadyOnChangeToPlayMode = false;
-            InteractivityManager.SingletonInstance.OnInteractivityStateChanged += OnInteractivityStateChanged;
-        }
         // The following is equivalent to the case of exiting play mode.
-        else if (!EditorApplication.isPaused &&
-            EditorApplication.isPlaying && 
+        if (!EditorApplication.isPaused &&
+            EditorApplication.isPlaying &&
             !EditorApplication.isPlayingOrWillChangePlaymode)
         {
             InteractivityManager.SingletonInstance.Dispose();
-        }
-    }
-
-    private void OnInteractivityStateChanged(object sender, InteractivityStateChangedEventArgs e)
-    {
-        if (InteractivityManager.SingletonInstance.InteractivityState == InteractivityState.ShortCodeRequired)
-        {
-            mockIsInteractive = true;
-            MockReady();
-            // Add a default participant if there isn't one, otherwise simulated controls won't work.
-            if (InteractivityManager.SingletonInstance.Participants.Count == 0)
-            {
-                MockParticipantJoin("Fake participant 1");
-            }
         }
     }
 
@@ -109,15 +79,6 @@ public class InteractiveSettingsWindow : EditorWindow
         }
 
         titleContent = new GUIContent("Interactive Editor");
-
-        mockAddcontrolID = string.Empty;
-        mockNewSceneSceneID = InteractivityManager.SingletonInstance.GetCurrentScene();
-        mockJoystickCoordinates = new Dictionary<string, Vector2>();
-        mockIsIsSceneCurrent = new Dictionary<string, bool>();
-        selectedControlIndex = 0;
-        showAdvancedOptions = false;
-        expandControlDetails = new Dictionary<string, bool>();
-
         EditorStyles.textArea.wordWrap = true;
 
         controlOptions = new string[]
@@ -130,7 +91,6 @@ public class InteractiveSettingsWindow : EditorWindow
                 "none", "minimal", "verbose"
            };
 
-        InteractivityManager.useMockData = true;
         string loggingLevel = EditorPrefs.GetString("MixerInteractive_LoggingLevel");
         loggingLevelSelectIndex = 0;
         switch (loggingLevel)
@@ -153,10 +113,15 @@ public class InteractiveSettingsWindow : EditorWindow
                 break;
         };
         scrollPos = new Vector2();
-        EditorApplication.playmodeStateChanged -= HandlePlayModeStateChanged;
-        EditorApplication.playmodeStateChanged += HandlePlayModeStateChanged;
+        EditorApplication.playModeStateChanged -= HandlePlayModeStateChanged;
+        EditorApplication.playModeStateChanged += HandlePlayModeStateChanged;
 
         initialized = true;
+    }
+
+    private void EditorApplication_playModeStateChanged(PlayModeStateChange obj)
+    {
+        throw new System.NotImplementedException();
     }
 
     void OnGUI()
@@ -171,7 +136,6 @@ public class InteractiveSettingsWindow : EditorWindow
 
         // This section is used for notifications
         if (Application.isPlaying &&
-            !mockIsInteractive &&
            (InteractivityManager.SingletonInstance.InteractivityState == InteractivityState.InteractivityEnabled) &&
            !Application.runInBackground)
         {
@@ -212,7 +176,7 @@ public class InteractiveSettingsWindow : EditorWindow
         }
 
         SectionSeperator();
-
+        
         // Share code
         EditorGUILayout.LabelField("Share Code", EditorStyles.boldLabel);
         EditorGUILayout.LabelField("Share Codes allow anyone running this game to access your interactive project. It is ideal for large game studios when you don't want to manually give each person access. You can get a short code from Interactive Studio by clicking the Manage Share Settings icon.", EditorStyles.wordWrappedLabel);
@@ -366,146 +330,12 @@ public class InteractiveSettingsWindow : EditorWindow
             Directory.CreateDirectory(Application.streamingAssetsPath);
         }
         string fullPathToConfigFile = Application.streamingAssetsPath + "/" + CONFIG_FILE_NAME;
-        File.WriteAllText(fullPathToConfigFile, 
+        File.WriteAllText(fullPathToConfigFile,
             "{ \"AppID\": \"" + appID + "\", \"ProjectVersionID\": \"" + projectVersionID + "\", \"ShareCode\": \"" + shareCode + "\"}");
     }
 
     private void RemoveSavedLoginInformation()
     {
-        RegistryKey key = Registry.CurrentUser.OpenSubKey("Software", true);
-        key.CreateSubKey("MixerInteractive");
-        key = key.OpenSubKey("MixerInteractive", true);
-        key.CreateSubKey("Configuration");
-        key = key.OpenSubKey("Configuration", true);
-        RegistryKey subKey = key.OpenSubKey(appID + "-" + projectVersionID, true);
-        if (subKey != null)
-        {
-            key.DeleteSubKey(appID + "-" + projectVersionID);
-        }
+        MixerInteractive.ClearSavedLoginInformation();
     }
-
-    private void MockReady()
-    {
-        InteractivityManager.SingletonInstance.SendMockWebSocketMessage(readyMessage);
-        InteractivityManager.SingletonInstance.DoWork();
-    }
-
-    private void MockParticipantJoin(string userID)
-    {
-        var participantJoinMessage = participantJoinMessageTemplate.Replace("{{UserName}}", userID);
-        InteractivityManager.SingletonInstance.SendMockWebSocketMessage(participantJoinMessage);
-        InteractivityManager.SingletonInstance.DoWork();
-    }
-
-    private void MockParticipantLeave(string userID)
-    {
-        var participantLeaveMessage = participantLeaveMessageTemplate.Replace("{{UserName}}", userID);
-        InteractivityManager.SingletonInstance.SendMockWebSocketMessage(participantLeaveMessage);
-        InteractivityManager.SingletonInstance.DoWork();
-    }
-
-    // Helper classes
-    const string readyMessage =
-    "{" +
-    "  \"type\": \"method\"," +
-    "  \"id\": 123," +
-    "  \"method\": \"onReady\"," +
-    "  \"discard\": true," +
-    "  \"params\": {" +
-    "    \"isReady\": true" +
-    "  }" +
-    "}";
-
-    const string buttonMessageTemplate =
-        "{" +
-        "  \"type\": \"method\"," +
-        "  \"id\": 123," +
-        "  \"method\": \"giveInput\"," +
-        "  \"discard\": true," +
-        "  \"params\": {" +
-        "    \"participantID\": \"efe5e1d6-a870-4f77-b7e4-1cfaf30b097e\"" +
-        "  }," +
-        "  \"input\": [" +
-        "    {" +
-        "      \"control\": {" +
-        "        \"controlID\": \"{{controlID}}\"," +
-        "        \"kind\": \"button\"" +
-        "      }," +
-        "      \"event\": \"{{event}}\"," +
-        "      \"button\": 0," +
-        "      \"transaction\": {" +
-        "        \"transactionID\": 501203," +
-        "        \"cost\": 100" +
-        "      }" +
-        "    }" +
-        "  ]" +
-        "}";
-
-    const string joystickMessageTemplate =
-    "{" +
-    "  \"type\": \"method\"," +
-    "  \"id\": 123," +
-    "  \"method\": \"giveInput\"," +
-    "  \"discard\": true," +
-    "  \"params\": {" +
-    "    \"participantID\": \"efe5e1d6-a870-4f77-b7e4-1cfaf30b097e\"" +
-    "  }," +
-    "  \"input\": [" +
-    "    {" +
-    "      \"control\": {" +
-    "        \"controlID\": \"{{controlID}}\"," +
-    "        \"kind\": \"joystick\"" +
-    "      }," +
-    "      \"event\": \"{{event}}\"," +
-    "      \"x\": {{x}}," +
-    "      \"y\": {{y}}" +
-    "    }" +
-    "  ]" +
-    "}";
-
-    const string participantJoinMessageTemplate =
-    "{" +
-    "  \"type\": \"method\"," +
-    "  \"id\": 123," +
-    "  \"method\": \"onParticipantJoin\"," +
-    "  \"params\": {" +
-    "    \"participants\": [" +
-    "            {" +
-    "            \"sessionID\": \"efe5e1d6-a870-4f77-b7e4-1cfaf30b097e\"," +
-    "            \"etag\": \"54600913\"," +
-    "            \"userID\": 146," +
-    "            \"username\": \"{{UserName}}\"," +
-    "            \"level\": 67," +
-    "            \"lastInputAt\": 1484763854277," +
-    "            \"connectedAt\": 1484763846242," +
-    "            \"disabled\": false," +
-    "            \"groupID\": \"default\"" +
-    "            }" +
-    "        ]" +
-    "    }," +
-    "  \"discard\": true" +
-    "}";
-
-    const string participantLeaveMessageTemplate =
-    "{" +
-    "  \"type\": \"method\"," +
-    "  \"id\": 123," +
-    "  \"method\": \"onParticipantLeave\"," +
-    "  \"params\": {" +
-    "    \"participants\": [" +
-    "            {" +
-    "            \"sessionID\": \"efe5e1d6-a870-4f77-b7e4-1cfaf30b097e\"," +
-    "            \"etag\": \"54600913\"," +
-    "            \"userID\": 146," +
-    "            \"username\": \"{{UserName}}\"," +
-    "            \"level\": 67," +
-    "            \"lastInputAt\": 1484763854277," +
-    "            \"connectedAt\": 1484763846242," +
-    "            \"disabled\": false," +
-    "            \"groupID\": \"default\"" +
-    "            }" +
-    "        ]" +
-    "    }," +
-    "  \"discard\": true" +
-    "}";
 }

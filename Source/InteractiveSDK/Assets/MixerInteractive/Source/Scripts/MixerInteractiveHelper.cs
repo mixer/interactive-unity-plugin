@@ -312,7 +312,7 @@ internal class MixerInteractiveHelper: MonoBehaviour
                 request.SetRequestHeader(headerKey, headers[headerKey]);
             }
         }
-        yield return request.Send();
+        yield return request.SendWebRequest();
         // We need to send raise the event on another thread, otherwise there 
         // will be frame drops.
         BackgroundWorker backgroundWorker = new BackgroundWorker();
