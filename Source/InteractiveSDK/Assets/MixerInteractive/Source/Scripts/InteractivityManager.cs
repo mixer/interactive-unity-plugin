@@ -446,7 +446,7 @@ namespace Microsoft.Mixer
 
         private void TryGetTokenAsync()
         {
-            Log("Trying to get a new OAuth token.");
+            Log("Trying to obtain a new OAuth token. This is an expected and repeated call.");
 
             mixerInteractiveHelper.OnInternalWebRequestStateChanged -= OnRequestOAuthExchangeTokenCompleted;
             mixerInteractiveHelper.OnInternalWebRequestStateChanged += OnRequestOAuthExchangeTokenCompleted;
@@ -473,7 +473,7 @@ namespace Microsoft.Mixer
             }
             else
             {
-                LogError("Error: Could not retrieve the URL for the websocket. Exception details: " + e.ErrorMessage);
+                LogError("Error: Failed to request an OAuth exchange token. Error message: " + e.ErrorMessage);
             }
         }
 
@@ -483,7 +483,6 @@ namespace Microsoft.Mixer
             {
                 case 200: // OK
                     string oauthExchangeCode = ParseOAuthExchangeCodeFromStringResponse(getShortCodeStatusServerResponse);
-                    Log("Retrieved an OAuth exchange token. Exchange token: " + oauthExchangeCode);
                     mixerInteractiveHelper.StopTimer(MixerInteractiveHelper.InteractiveTimerType.CheckAuthStatus);
                     GetOauthToken(oauthExchangeCode);
                     break;
@@ -548,7 +547,7 @@ namespace Microsoft.Mixer
             }
             else
             {
-                LogError("Error: Could not retrieve the URL for the websocket. Exception details: " + e.ErrorMessage);
+                LogError("Error: Failed to request an OAuth token. Error message: " + e.ErrorMessage);
             }
         }
 
@@ -556,7 +555,7 @@ namespace Microsoft.Mixer
         {
             if (statusCode == 400)
             {
-                LogError("Error: " + getCodeServerResponse);
+                LogError("Error: " + getCodeServerResponse + " while requesting an OAuth token.");
                 return;
             }
             string refreshToken = string.Empty;
@@ -619,11 +618,16 @@ namespace Microsoft.Mixer
             mixerInteractiveHelper.OnInternalWebRequestStateChanged -= OnRequestRefresheShortCodeCompleted;
             if (e.Succeeded)
             {
+                if (e.ResponseCode == 404)
+                {
+                    LogError("Error: OAuth Client ID not found. Make sure the OAuth Client ID you specified in the Unity editor matches the one in Interactive Studio.");
+                    return;
+                }
                 CompleteRefreshShortCode(e.ResponseText);
             }
             else
             {
-                LogError("Error: Could not retrieve the URL for the websocket. Exception details: " + e.ErrorMessage);
+                LogError("Error: Failed to retrieve a short code for short code authentication. Error message: " + e.ErrorMessage);
             }
         }
 
@@ -726,13 +730,13 @@ namespace Microsoft.Mixer
                 }
                 else
                 {
-                    LogError("Error: Failed to while trying to validate a cached auth token.");
+                    LogError("Error: Failed to while trying to validate a cached auth token. Error code: " + e.ResponseCode);
                 }
                 CompleteVerifyAuthTokenRequestStart(isTokenValid);
             }
             else
             {
-                LogError("Error: Could not retrieve the URL for the websocket. Exception details: " + e.ErrorMessage);
+                LogError("Error: Failed to verify the auth token. Error message: " + e.ErrorMessage);
             }
         }
 
@@ -796,7 +800,7 @@ namespace Microsoft.Mixer
         private void OnWebSocketError(object sender, ErrorEventArgs args)
         {
             UpdateInteractivityState(InteractivityState.InteractivityDisabled);
-            LogError(args.Message);
+            LogError("Error: Websocket OnError: " + args.Message);
         }
 
         private void OnWebSocketClose(object sender, CloseEventArgs args)
@@ -804,17 +808,17 @@ namespace Microsoft.Mixer
             UpdateInteractivityState(InteractivityState.InteractivityDisabled);
             if (args.Code == 4019)
             {
-                LogError("Error 4019: You don't have access to this project. Make sure that the account you are signed in with has " +
-                    "access to this Project ID. If you are using a share code, make sure that the share code value is correct.");
+                LogError("Connection failed (error code 4019): You don't have access to this project. Make sure that the account you are signed in with has " +
+                    "access to this Version ID. If you are using a share code, make sure that the share code value matches the one in Interactive Studio for this project.");
             }
             else if (args.Code == 4020)
             {
-                LogError("Error 4020: The interactive version was not found or you do not have access to it. Make sure that the account you are signed in with has " +
-                    "access to this Project ID. If you are using a share code, make sure that the share code value is correct.");
+                LogError("Connection failed (error code 4020): The interactive version was not found or you do not have access to it. Make sure that the account you are signed in with has " +
+                    "access to this Version ID. If you are using a share code, make sure that the share code value matches the one in Interactive Studio for this project.");
             }
             else if (args.Code == 4021)
             {
-                LogError("Error 4021: You are connected to this session somewhere else. Please disconnect from that session and try again.");
+                LogError("Connection failed (error code 4021): You are connected to this session somewhere else. Please disconnect from that session and try again.");
             }
             else
             {
@@ -860,7 +864,7 @@ namespace Microsoft.Mixer
             }
             else
             {
-                LogError("Error: Could not retrieve the URL for the websocket. Exception details: " + e.ErrorMessage);
+                LogError("Error: Web request to refresh the Auth token failed. Error message: " + e.ErrorMessage);
             }
         }
 
@@ -868,7 +872,7 @@ namespace Microsoft.Mixer
         {
             if (statusCode == 400)
             {
-                LogError("Error: " + getCodeServerResponse);
+                LogError("Error: " + getCodeServerResponse + " trying to refresh the auth token.");
             }
             string accessToken = string.Empty;
             string refreshToken = string.Empty;
@@ -1012,7 +1016,7 @@ namespace Microsoft.Mixer
                 }
                 else
                 {
-                    LogError("Error: The control is not a button. Only buttons have cooldowns.");
+                    LogError("Error: The control is not a button. You can only trigger a cooldown on a button.");
                     return;
                 }
             }
@@ -1329,14 +1333,14 @@ namespace Microsoft.Mixer
                         }
                         catch (Exception ex)
                         {
-                            LogError("Error: Error while processing method: " + methodName + ". Exception: " + ex.Message);
+                            LogError("Error: Error while processing method: " + methodName + ". Error message: " + ex.Message);
                         }
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                LogError("Error: Determining method.");
+                LogError("Error: Error processing websocket message. Error message: " + ex.Message);
             }
         }
 
@@ -3200,8 +3204,7 @@ namespace Microsoft.Mixer
             {
                 return;
             }
-
-            UnityEngine.Debug.Log(message);
+            Debug.Log(message);
         }
 
         private void ClearPreviousControlState()

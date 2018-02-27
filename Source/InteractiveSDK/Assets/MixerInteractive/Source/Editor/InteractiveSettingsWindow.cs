@@ -203,11 +203,11 @@ public class InteractiveSettingsWindow : EditorWindow
                 !string.IsNullOrEmpty(projectVersionID))
             {
                 WriteConfigFile();
-                EditorUtility.DisplayDialog("Project information saved successfully", "This Unity game is now associated with your interactive project.", "Close");
+                EditorUtility.DisplayDialog("Project information saved successfully", "This Unity game is now associated with your interactive project.", "OK");
             }
             else
             {
-                EditorUtility.DisplayDialog("Error: Could not save project information", "The OAuth Client ID and Project Version ID cannot be empty.", "Close");
+                EditorUtility.DisplayDialog("Error: Could not save project information", "The OAuth Client ID and Project Version ID cannot be empty.", "OK");
             }
         }
 
