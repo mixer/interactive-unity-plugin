@@ -203,11 +203,11 @@ public class InteractiveSettingsWindow : EditorWindow
                 !string.IsNullOrEmpty(projectVersionID))
             {
                 WriteConfigFile();
-                EditorUtility.DisplayDialog("Project information saved successfully", "This Unity game is now associated with your interactive project.", "Close");
+                EditorUtility.DisplayDialog("Project information saved successfully", "This Unity game is now associated with your interactive project.", "OK");
             }
             else
             {
-                EditorUtility.DisplayDialog("Error: Could not save project information", "The OAuth Client ID and Project Version ID cannot be empty.", "Close");
+                EditorUtility.DisplayDialog("Error: Could not save project information", "The OAuth Client ID and Project Version ID cannot be empty.", "OK");
             }
         }
 
@@ -504,6 +504,7 @@ public class InteractiveSettingsWindow : EditorWindow
             {
                 shareCode = string.Empty;
                 RemoveSavedLoginInformation();
+                EditorUtility.DisplayDialog("Login info cleared", "Your login information was cleared successfully. The next time you try to connect to interactive, you will be prompted to log in.", "OK");
             }
 
             SectionSeperator();
@@ -520,11 +521,11 @@ public class InteractiveSettingsWindow : EditorWindow
                     shareCode != null) // We allow an empty Share Code, because that allows the developer to clear the Share Code.
                 {
                     WriteConfigFile();
-                    EditorUtility.DisplayDialog("Share Code saved successfully", "Anyone running this game will now have access to the interactive project.", "Close");
+                    EditorUtility.DisplayDialog("Share Code saved successfully", "Anyone running this game will now have access to the interactive project.", "OK");
                 }
                 else
                 {
-                    EditorUtility.DisplayDialog("Error: Could not save project information", "The OAuth Client ID, Project Version ID and Share Code cannot be empty.", "Close");
+                    EditorUtility.DisplayDialog("Error: Could not save project information", "The OAuth Client ID, Project Version ID and Share Code cannot be empty.", "OK");
                 }
             }
             EditorGUILayout.EndHorizontal();
