@@ -22,32 +22,21 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
+using Microsoft.Mixer;
 using Newtonsoft.Json;
-using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
-using Microsoft.Mixer;
-using Microsoft.Win32;
 
 public class InteractiveSettingsWindow : EditorWindow
 {
     private static string appID;
     private static string projectVersionID;
     private static string shareCode;
-    private static string mockAddcontrolID;
-    public static Dictionary<string, Vector2> mockJoystickCoordinates;
-    public static Dictionary<string, bool> mockIsIsSceneCurrent;
-    private static string mockParticipantJoinUsername;
-    private static string mockNewSceneSceneID;
     private static int selectedControlIndex;
     private static int loggingLevelSelectIndex;
-    private static bool showAdvancedOptions;
-    private static bool mockIsInteractive = false;
-    public static Dictionary<string, bool> expandControlDetails;
     private const string CONFIG_FILE_NAME = "interactiveconfig.json";
     private bool shouldSwitchToRunInBackground = false;
-    private bool sendMockReadyOnChangeToPlayMode = false;
     LoggingLevel currentLogLevel;
     private Vector2 scrollPos;
     private static bool showApiExplorer;
@@ -67,33 +56,14 @@ public class InteractiveSettingsWindow : EditorWindow
     {
     }
 
-    void HandlePlayModeStateChanged()
+    void HandlePlayModeStateChanged(PlayModeStateChange args)
     {
-        if (EditorApplication.isPlaying && sendMockReadyOnChangeToPlayMode)
-        {
-            sendMockReadyOnChangeToPlayMode = false;
-            InteractivityManager.SingletonInstance.OnInteractivityStateChanged += OnInteractivityStateChanged;
-        }
         // The following is equivalent to the case of exiting play mode.
-        else if (!EditorApplication.isPaused &&
-            EditorApplication.isPlaying && 
+        if (!EditorApplication.isPaused &&
+            EditorApplication.isPlaying &&
             !EditorApplication.isPlayingOrWillChangePlaymode)
         {
             InteractivityManager.SingletonInstance.Dispose();
-        }
-    }
-
-    private void OnInteractivityStateChanged(object sender, InteractivityStateChangedEventArgs e)
-    {
-        if (InteractivityManager.SingletonInstance.InteractivityState == InteractivityState.ShortCodeRequired)
-        {
-            mockIsInteractive = true;
-            MockReady();
-            // Add a default participant if there isn't one, otherwise simulated controls won't work.
-            if (InteractivityManager.SingletonInstance.Participants.Count == 0)
-            {
-                MockParticipantJoin("Fake participant 1");
-            }
         }
     }
 
@@ -109,15 +79,6 @@ public class InteractiveSettingsWindow : EditorWindow
         }
 
         titleContent = new GUIContent("Interactive Editor");
-
-        mockAddcontrolID = string.Empty;
-        mockNewSceneSceneID = InteractivityManager.SingletonInstance.GetCurrentScene();
-        mockJoystickCoordinates = new Dictionary<string, Vector2>();
-        mockIsIsSceneCurrent = new Dictionary<string, bool>();
-        selectedControlIndex = 0;
-        showAdvancedOptions = false;
-        expandControlDetails = new Dictionary<string, bool>();
-
         EditorStyles.textArea.wordWrap = true;
 
         controlOptions = new string[]
@@ -130,7 +91,6 @@ public class InteractiveSettingsWindow : EditorWindow
                 "none", "minimal", "verbose"
            };
 
-        InteractivityManager.useMockData = true;
         string loggingLevel = EditorPrefs.GetString("MixerInteractive_LoggingLevel");
         loggingLevelSelectIndex = 0;
         switch (loggingLevel)
@@ -153,10 +113,15 @@ public class InteractiveSettingsWindow : EditorWindow
                 break;
         };
         scrollPos = new Vector2();
-        EditorApplication.playmodeStateChanged -= HandlePlayModeStateChanged;
-        EditorApplication.playmodeStateChanged += HandlePlayModeStateChanged;
+        EditorApplication.playModeStateChanged -= HandlePlayModeStateChanged;
+        EditorApplication.playModeStateChanged += HandlePlayModeStateChanged;
 
         initialized = true;
+    }
+
+    private void EditorApplication_playModeStateChanged(PlayModeStateChange obj)
+    {
+        throw new System.NotImplementedException();
     }
 
     void OnGUI()
@@ -171,7 +136,6 @@ public class InteractiveSettingsWindow : EditorWindow
 
         // This section is used for notifications
         if (Application.isPlaying &&
-            !mockIsInteractive &&
            (InteractivityManager.SingletonInstance.InteractivityState == InteractivityState.InteractivityEnabled) &&
            !Application.runInBackground)
         {
@@ -213,323 +177,69 @@ public class InteractiveSettingsWindow : EditorWindow
 
         SectionSeperator();
 
-        if (!Application.isPlaying)
+        EditorGUILayout.LabelField("Log level", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("Change the amount of informational logging from the Mixer SDK. The output will appear in the Unity Console.", EditorStyles.wordWrappedLabel);
+        int oldLogLevelIndex = loggingLevelSelectIndex;
+        loggingLevelSelectIndex = EditorGUILayout.Popup("", loggingLevelSelectIndex, logLevelOptions, GUILayout.Width(96));
+        if (oldLogLevelIndex != loggingLevelSelectIndex)
         {
-            EditorGUILayout.LabelField("You need to be in play mode and interactive to simulate controls, participants and scenes.", EditorStyles.wordWrappedLabel);
-            if (GUILayout.Button("Play and go interactive"))
+            string newLoggingLevel = string.Empty;
+            switch (loggingLevelSelectIndex)
             {
-                sendMockReadyOnChangeToPlayMode = true;
-                EditorApplication.isPlaying = true;
-                mockIsInteractive = true;
+                case 0:
+                    newLoggingLevel = "none";
+                    InteractivityManager.SingletonInstance.LoggingLevel = LoggingLevel.None;
+                    break;
+                case 1:
+                    newLoggingLevel = "minimal";
+                    InteractivityManager.SingletonInstance.LoggingLevel = LoggingLevel.Minimal;
+                    break;
+                case 2:
+                    newLoggingLevel = "verbose";
+                    InteractivityManager.SingletonInstance.LoggingLevel = LoggingLevel.Verbose;
+                    break;
+                default:
+                    break;
             }
-            EditorGUILayout.HelpBox("Note: The button above will only work in the Unity Editor. Outside the editor, your game will need to call the InteractivityManager.StartInteractive() method.", MessageType.Info);
-        }
-        else if (InteractivityManager.SingletonInstance.InteractivityState != InteractivityState.InteractivityEnabled &&
-            !mockIsInteractive)
-        {
-            EditorGUILayout.LabelField("You must be in interactive mode to simulate controls, participants and scenes. You can fix this by clicking the Go Interactive button below.", EditorStyles.wordWrappedLabel);
-            if (GUILayout.Button("Go interactive"))
-            {
-                mockIsInteractive = true;
-                MockReady();
-                // Add a default participant if there isn't one, otherwise simulated controls won't work.
-                if (InteractivityManager.SingletonInstance.Participants.Count == 0)
-                {
-                    MockParticipantJoin("Fake participant 1");
-                }
-            }
-            EditorGUILayout.HelpBox("Note: The button above will only work in the Unity Editor. Outside the editor, your game will need to call the InteractivityManager.StartInteractive() method.", MessageType.Info);
-        }
-
-        SectionSeperator();
-
-        // Input Simulation
-        EditorGUILayout.LabelField("Controls", EditorStyles.boldLabel);
-        if (Application.isPlaying &&
-            (InteractivityManager.SingletonInstance.InteractivityState == InteractivityState.InteractivityEnabled ||
-            mockIsInteractive))
-        {
-            SectionSeperator();
-            EditorGUILayout.LabelField("Add new mock controls by filling out the information and clicking the Add button below.", EditorStyles.wordWrappedLabel);
-            EditorGUILayout.BeginHorizontal();
-            mockAddcontrolID = EditorGUILayout.TextField(mockAddcontrolID);
-            selectedControlIndex = EditorGUILayout.Popup("", selectedControlIndex, controlOptions, GUILayout.Width(96));
-            if (GUILayout.Button("Add", GUILayout.Width(64)))
-            {
-                if (selectedControlIndex == CONTROL_DROPDOWN_BUTTON_INDEX)
-                {
-                    InteractivityManager.SingletonInstance.Buttons.Add(new InteractiveButtonControl(mockAddcontrolID, true, "", 0, "", ""));
-                }
-                else if (selectedControlIndex == CONTROL_JOYSTICK_BUTTON_INDEX)
-                {
-                    InteractivityManager.SingletonInstance.Joysticks.Add(new InteractiveJoystickControl(mockAddcontrolID, true, "", "", ""));
-                }
-            }
-            EditorGUILayout.EndHorizontal();
-
-            List<InteractiveButtonControl> buttons = InteractivityManager.SingletonInstance.Buttons as List<InteractiveButtonControl>;
-            List<InteractiveJoystickControl> joysticks = InteractivityManager.SingletonInstance.Joysticks as List<InteractiveJoystickControl>;
-            List<InteractiveControl> controls = new List<InteractiveControl>();
-            foreach (InteractiveButtonControl button in buttons)
-            {
-                controls.Add(button);
-            }
-            foreach (InteractiveJoystickControl joystick in joysticks)
-            {
-                controls.Add(joystick);
-            }
-            if (controls != null &&
-                controls.Count > 0)
-            {
-                SectionSeperator();
-                EditorGUILayout.LabelField("Controls", EditorStyles.boldLabel);
-
-                EditorGUILayout.BeginVertical();
-                for (var i = 0; i < controls.Count; i++)
-                {
-                    string currentcontrolID = controls[i].ControlID;
-                    if (currentcontrolID != null &&
-                        controls[i] as InteractiveButtonControl != null)
-                    {
-                        bool expanded;
-                        if (!expandControlDetails.TryGetValue(currentcontrolID, out expanded))
-                        {
-                            expandControlDetails.Add(currentcontrolID, expanded);
-                        }
-                        expandControlDetails[currentcontrolID] = EditorGUILayout.Foldout(expandControlDetails[currentcontrolID], currentcontrolID);
-                        if (expandControlDetails[currentcontrolID])
-                        {
-                            EditorGUILayout.BeginHorizontal();
-                            if (GUILayout.Button("Press Down"))
-                            {
-                                string buttonInputMessage = buttonMessageTemplate.Replace("{{controlID}}", currentcontrolID).Replace("{{event}}", "mousedown");
-                                InteractivityManager.SingletonInstance.SendMockWebSocketMessage(buttonInputMessage);
-                            }
-                            if (GUILayout.Button("Press Up"))
-                            {
-                                string buttonInputMessage = buttonMessageTemplate.Replace("{{controlID}}", currentcontrolID).Replace("{{event}}", "mouseup");
-                                InteractivityManager.SingletonInstance.SendMockWebSocketMessage(buttonInputMessage);
-                            }
-                            if (GUILayout.Button("Remove"))
-                            {
-                                for (int j = 0; j < InteractivityManager.SingletonInstance.Buttons.Count; j++)
-                                {
-                                    if (currentcontrolID == InteractivityManager.SingletonInstance.Buttons[j].ControlID)
-                                    {
-                                        InteractivityManager.SingletonInstance.Buttons.RemoveAt(j);
-                                    }
-                                }
-                            }
-                            EditorGUILayout.EndHorizontal();
-                        }
-                    }
-                    else if (controls[i] as InteractiveJoystickControl != null)
-                    {
-                        EditorGUILayout.BeginVertical();
-                        bool expanded;
-                        if (!expandControlDetails.TryGetValue(currentcontrolID, out expanded))
-                        {
-                            expandControlDetails.Add(currentcontrolID, expanded);
-                        }
-                        expandControlDetails[currentcontrolID] = EditorGUILayout.Foldout(expandControlDetails[currentcontrolID], currentcontrolID);
-                        if (expandControlDetails[currentcontrolID])
-                        {
-                            Vector2 mockCoordinates = new Vector2();
-                            if (!mockJoystickCoordinates.TryGetValue(currentcontrolID, out mockCoordinates))
-                            {
-                                mockJoystickCoordinates.Add(currentcontrolID, mockCoordinates);
-                            }
-                            EditorGUILayout.BeginHorizontal();
-                            EditorGUILayout.LabelField("x", GUILayout.Width(16));
-                            mockCoordinates.x = EditorGUILayout.Slider(mockJoystickCoordinates[currentcontrolID].x, -1, 1);
-                            EditorGUILayout.EndHorizontal();
-
-                            EditorGUILayout.BeginHorizontal();
-                            EditorGUILayout.LabelField("y", GUILayout.Width(16));
-                            mockCoordinates.y = EditorGUILayout.Slider(mockJoystickCoordinates[currentcontrolID].y, -1, 1);
-                            EditorGUILayout.EndHorizontal();
-                            mockJoystickCoordinates[currentcontrolID] = mockCoordinates;
-                            if (GUILayout.Button("Remove"))
-                            {
-                                for (int j = 0; j < InteractivityManager.SingletonInstance.Joysticks.Count; j++)
-                                {
-                                    if (currentcontrolID == InteractivityManager.SingletonInstance.Joysticks[j].ControlID)
-                                    {
-                                        InteractivityManager.SingletonInstance.Joysticks.RemoveAt(j);
-                                    }
-                                }
-                            }
-                            string joystickInputMessage = joystickMessageTemplate.Replace("{{controlID}}", currentcontrolID)
-                                .Replace("{{event}}", "move")
-                                .Replace("{{x}}", mockJoystickCoordinates[currentcontrolID].x.ToString())
-                                .Replace("{{y}}", mockJoystickCoordinates[currentcontrolID].y.ToString());
-
-                            InteractivityManager.SingletonInstance.SendMockWebSocketMessage(joystickInputMessage);
-                        }
-                        EditorGUILayout.EndVertical();
-                    }
-                }
-                EditorGUILayout.EndVertical();
-            }
-        }
-        else
-        {
-            EditorGUILayout.LabelField("You need to be playing and in interactive mode to simulate controls.", EditorStyles.wordWrappedLabel);
-        }
-
-        // Participant simulation
-        SectionSeperator();
-        EditorGUILayout.LabelField("Participants", EditorStyles.boldLabel);
-        if (Application.isPlaying &&
-            (InteractivityManager.SingletonInstance.InteractivityState == InteractivityState.InteractivityEnabled ||
-            mockIsInteractive))
-        {
-            EditorGUILayout.LabelField("Enter a username and click the Join button to add a participant.", EditorStyles.wordWrappedLabel);
-            EditorGUILayout.BeginHorizontal();
-            if (mockParticipantJoinUsername == null)
-            {
-                mockParticipantJoinUsername = "";
-            }
-            mockParticipantJoinUsername = EditorGUILayout.TextField(mockParticipantJoinUsername);
-            if (GUILayout.Button("Join"))
-            {
-                MockParticipantJoin(mockParticipantJoinUsername);
-            }
-            EditorGUILayout.EndHorizontal();
-            List<InteractiveParticipant> participants = InteractivityManager.SingletonInstance.Participants as List<InteractiveParticipant>;
-            if (participants != null)
-            {
-                if (participants.Count > 0)
-                {
-                    SectionSeperator();
-                    EditorGUILayout.LabelField("Participants", EditorStyles.boldLabel);
-                }
-                for (var i = 0; i < participants.Count; i++)
-                {
-                    EditorGUILayout.BeginHorizontal();
-                    EditorGUILayout.LabelField(participants[i].UserName);
-                    if (GUILayout.Button("Leave"))
-                    {
-                        MockParticipantLeave(participants[i].UserName);
-                    }
-                    EditorGUILayout.EndHorizontal();
-                }
-            }
-        }
-        else
-        {
-            EditorGUILayout.LabelField("You must be playing and in interactive mode to simulate participants.", EditorStyles.wordWrappedLabel);
+            EditorPrefs.SetString("MixerInteractive_LoggingLevel", newLoggingLevel);
         }
 
         SectionSeperator();
 
-        // Scenes
-        EditorGUILayout.LabelField("Change scenes", EditorStyles.boldLabel);
-        if (Application.isPlaying &&
-            (InteractivityManager.SingletonInstance.InteractivityState == InteractivityState.InteractivityEnabled ||
-            mockIsInteractive))
+        // Share code
+        EditorGUILayout.LabelField("Share Code", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("Share Codes allow anyone running this game to access your interactive project. It is ideal for large game studios when you don't want to manually give each person access. You can get a short code from Interactive Studio by clicking the Manage Share Settings icon.", EditorStyles.wordWrappedLabel);
+        EditorGUILayout.BeginHorizontal();
+        shareCode = EditorGUILayout.TextField("Share Code", shareCode);
+        if (GUILayout.Button("Save"))
         {
-            SectionSeperator();
-
-            EditorGUILayout.LabelField("Enter an ID for the scene, then click the Change button to change to that scene.", EditorStyles.wordWrappedLabel);
-            EditorGUILayout.BeginHorizontal();
-            if (mockNewSceneSceneID == null)
+            if (!string.IsNullOrEmpty(appID) &&
+                !string.IsNullOrEmpty(projectVersionID) &&
+                shareCode != null) // We allow an empty Share Code, because that allows the developer to clear the Share Code.
             {
-                mockNewSceneSceneID = string.Empty;
+                WriteConfigFile();
+                EditorUtility.DisplayDialog("Share Code saved successfully", "Anyone running this game will now have access to the interactive project.", "OK");
             }
-            mockNewSceneSceneID = EditorGUILayout.TextField(mockNewSceneSceneID);
-            if (GUILayout.Button("Change"))
+            else
             {
-                InteractivityManager.SingletonInstance.SetCurrentScene(mockNewSceneSceneID);
+                EditorUtility.DisplayDialog("Error: Could not save project information", "The OAuth Client ID, Project Version ID and Share Code cannot be empty.", "OK");
             }
-            EditorGUILayout.EndHorizontal();
         }
-        else
-        {
-            EditorGUILayout.LabelField("You need to be in play mode and interactive to change scenes.", EditorStyles.wordWrappedLabel);
-        }
+        EditorGUILayout.EndHorizontal();
 
         SectionSeperator();
 
-        if (InteractivityManager.SingletonInstance.InteractivityState == InteractivityState.InteractivityEnabled)
+        // Clear project information
+        EditorGUILayout.LabelField("Clear saved login information", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("Clearing authentication tokens will delete any cached tokens. This is useful if you want to do testing with a new Mixer account.", EditorStyles.wordWrappedLabel);
+        if (GUILayout.Button("Clear saved login information"))
         {
-            SectionSeperator();
-            EditorGUILayout.LabelField("Stop Interactive", EditorStyles.boldLabel);
-            EditorGUILayout.LabelField("Clicking the Stop Interactive button will simulate disconnecting from the Mixer Service.", EditorStyles.wordWrappedLabel);
-            if (GUILayout.Button("Stop interactive"))
-            {
-                mockIsInteractive = false;
-                InteractivityManager.SingletonInstance.StopInteractive();
-            }
+            shareCode = string.Empty;
+            RemoveSavedLoginInformation();
+            EditorUtility.DisplayDialog("Login info cleared", "Your login information was cleared successfully. The next time you try to connect to interactive, you will be prompted to log in.", "OK");
         }
 
-        showAdvancedOptions = EditorGUILayout.Foldout(showAdvancedOptions, "Advanced settings", true, EditorStyles.foldout);
-        if (showAdvancedOptions)
-        {
-            SectionSeperator();
-
-            EditorGUILayout.LabelField("Log level", EditorStyles.boldLabel);
-            EditorGUILayout.LabelField("Change the amount of informational logging from the Mixer SDK. The output will appear in the Unity Console.", EditorStyles.wordWrappedLabel);
-            int oldLogLevelIndex = loggingLevelSelectIndex;
-            loggingLevelSelectIndex = EditorGUILayout.Popup("", loggingLevelSelectIndex, logLevelOptions, GUILayout.Width(96));
-            if (oldLogLevelIndex != loggingLevelSelectIndex)
-            {
-                string newLoggingLevel = string.Empty;
-                switch (loggingLevelSelectIndex)
-                {
-                    case 0:
-                        newLoggingLevel = "none";
-                        InteractivityManager.SingletonInstance.LoggingLevel = LoggingLevel.None;
-                        break;
-                    case 1:
-                        newLoggingLevel = "minimal";
-                        InteractivityManager.SingletonInstance.LoggingLevel = LoggingLevel.Minimal;
-                        break;
-                    case 2:
-                        newLoggingLevel = "verbose";
-                        InteractivityManager.SingletonInstance.LoggingLevel = LoggingLevel.Verbose;
-                        break;
-                    default:
-                        break;
-                }
-                EditorPrefs.SetString("MixerInteractive_LoggingLevel", newLoggingLevel);
-            }
-
-            SectionSeperator();
-
-            // Clear project information
-            EditorGUILayout.LabelField("Clear saved login information", EditorStyles.boldLabel);
-            EditorGUILayout.LabelField("Clearing authentication tokens will delete any cached tokens. This is useful if you want to do testing with a new Mixer account.", EditorStyles.wordWrappedLabel);
-            if (GUILayout.Button("Clear saved login information"))
-            {
-                shareCode = string.Empty;
-                RemoveSavedLoginInformation();
-                EditorUtility.DisplayDialog("Login info cleared", "Your login information was cleared successfully. The next time you try to connect to interactive, you will be prompted to log in.", "OK");
-            }
-
-            SectionSeperator();
-
-            // Share code
-            EditorGUILayout.LabelField("Share Code", EditorStyles.boldLabel);
-            EditorGUILayout.LabelField("Share Codes allow anyone running this game to access your interactive project. It is ideal for large game studios when you don't want to manually give each person access. You can get a short code from Interactive Studio by clicking the Manage Share Settings icon.", EditorStyles.wordWrappedLabel);
-            EditorGUILayout.BeginHorizontal();
-            shareCode = EditorGUILayout.TextField("Share Code", shareCode);
-            if (GUILayout.Button("Save"))
-            {
-                if (!string.IsNullOrEmpty(appID) &&
-                    !string.IsNullOrEmpty(projectVersionID) &&
-                    shareCode != null) // We allow an empty Share Code, because that allows the developer to clear the Share Code.
-                {
-                    WriteConfigFile();
-                    EditorUtility.DisplayDialog("Share Code saved successfully", "Anyone running this game will now have access to the interactive project.", "OK");
-                }
-                else
-                {
-                    EditorUtility.DisplayDialog("Error: Could not save project information", "The OAuth Client ID, Project Version ID and Share Code cannot be empty.", "OK");
-                }
-            }
-            EditorGUILayout.EndHorizontal();
-        }
+        SectionSeperator();
 
         EditorGUILayout.EndVertical();
         EditorGUILayout.EndScrollView();
@@ -621,146 +331,12 @@ public class InteractiveSettingsWindow : EditorWindow
             Directory.CreateDirectory(Application.streamingAssetsPath);
         }
         string fullPathToConfigFile = Application.streamingAssetsPath + "/" + CONFIG_FILE_NAME;
-        File.WriteAllText(fullPathToConfigFile, 
+        File.WriteAllText(fullPathToConfigFile,
             "{ \"AppID\": \"" + appID + "\", \"ProjectVersionID\": \"" + projectVersionID + "\", \"ShareCode\": \"" + shareCode + "\"}");
     }
 
     private void RemoveSavedLoginInformation()
     {
-        RegistryKey key = Registry.CurrentUser.OpenSubKey("Software", true);
-        key.CreateSubKey("MixerInteractive");
-        key = key.OpenSubKey("MixerInteractive", true);
-        key.CreateSubKey("Configuration");
-        key = key.OpenSubKey("Configuration", true);
-        RegistryKey subKey = key.OpenSubKey(appID + "-" + projectVersionID, true);
-        if (subKey != null)
-        {
-            key.DeleteSubKey(appID + "-" + projectVersionID);
-        }
+        MixerInteractive.ClearSavedLoginInformation();
     }
-
-    private void MockReady()
-    {
-        InteractivityManager.SingletonInstance.SendMockWebSocketMessage(readyMessage);
-        InteractivityManager.SingletonInstance.DoWork();
-    }
-
-    private void MockParticipantJoin(string userID)
-    {
-        var participantJoinMessage = participantJoinMessageTemplate.Replace("{{UserName}}", userID);
-        InteractivityManager.SingletonInstance.SendMockWebSocketMessage(participantJoinMessage);
-        InteractivityManager.SingletonInstance.DoWork();
-    }
-
-    private void MockParticipantLeave(string userID)
-    {
-        var participantLeaveMessage = participantLeaveMessageTemplate.Replace("{{UserName}}", userID);
-        InteractivityManager.SingletonInstance.SendMockWebSocketMessage(participantLeaveMessage);
-        InteractivityManager.SingletonInstance.DoWork();
-    }
-
-    // Helper classes
-    const string readyMessage =
-    "{" +
-    "  \"type\": \"method\"," +
-    "  \"id\": 123," +
-    "  \"method\": \"onReady\"," +
-    "  \"discard\": true," +
-    "  \"params\": {" +
-    "    \"isReady\": true" +
-    "  }" +
-    "}";
-
-    const string buttonMessageTemplate =
-        "{" +
-        "  \"type\": \"method\"," +
-        "  \"id\": 123," +
-        "  \"method\": \"giveInput\"," +
-        "  \"discard\": true," +
-        "  \"params\": {" +
-        "    \"participantID\": \"efe5e1d6-a870-4f77-b7e4-1cfaf30b097e\"" +
-        "  }," +
-        "  \"input\": [" +
-        "    {" +
-        "      \"control\": {" +
-        "        \"controlID\": \"{{controlID}}\"," +
-        "        \"kind\": \"button\"" +
-        "      }," +
-        "      \"event\": \"{{event}}\"," +
-        "      \"button\": 0," +
-        "      \"transaction\": {" +
-        "        \"transactionID\": 501203," +
-        "        \"cost\": 100" +
-        "      }" +
-        "    }" +
-        "  ]" +
-        "}";
-
-    const string joystickMessageTemplate =
-    "{" +
-    "  \"type\": \"method\"," +
-    "  \"id\": 123," +
-    "  \"method\": \"giveInput\"," +
-    "  \"discard\": true," +
-    "  \"params\": {" +
-    "    \"participantID\": \"efe5e1d6-a870-4f77-b7e4-1cfaf30b097e\"" +
-    "  }," +
-    "  \"input\": [" +
-    "    {" +
-    "      \"control\": {" +
-    "        \"controlID\": \"{{controlID}}\"," +
-    "        \"kind\": \"joystick\"" +
-    "      }," +
-    "      \"event\": \"{{event}}\"," +
-    "      \"x\": {{x}}," +
-    "      \"y\": {{y}}" +
-    "    }" +
-    "  ]" +
-    "}";
-
-    const string participantJoinMessageTemplate =
-    "{" +
-    "  \"type\": \"method\"," +
-    "  \"id\": 123," +
-    "  \"method\": \"onParticipantJoin\"," +
-    "  \"params\": {" +
-    "    \"participants\": [" +
-    "            {" +
-    "            \"sessionID\": \"efe5e1d6-a870-4f77-b7e4-1cfaf30b097e\"," +
-    "            \"etag\": \"54600913\"," +
-    "            \"userID\": 146," +
-    "            \"username\": \"{{UserName}}\"," +
-    "            \"level\": 67," +
-    "            \"lastInputAt\": 1484763854277," +
-    "            \"connectedAt\": 1484763846242," +
-    "            \"disabled\": false," +
-    "            \"groupID\": \"default\"" +
-    "            }" +
-    "        ]" +
-    "    }," +
-    "  \"discard\": true" +
-    "}";
-
-    const string participantLeaveMessageTemplate =
-    "{" +
-    "  \"type\": \"method\"," +
-    "  \"id\": 123," +
-    "  \"method\": \"onParticipantLeave\"," +
-    "  \"params\": {" +
-    "    \"participants\": [" +
-    "            {" +
-    "            \"sessionID\": \"efe5e1d6-a870-4f77-b7e4-1cfaf30b097e\"," +
-    "            \"etag\": \"54600913\"," +
-    "            \"userID\": 146," +
-    "            \"username\": \"{{UserName}}\"," +
-    "            \"level\": 67," +
-    "            \"lastInputAt\": 1484763854277," +
-    "            \"connectedAt\": 1484763846242," +
-    "            \"disabled\": false," +
-    "            \"groupID\": \"default\"" +
-    "            }" +
-    "        ]" +
-    "    }," +
-    "  \"discard\": true" +
-    "}";
 }

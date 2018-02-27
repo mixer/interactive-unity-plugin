@@ -316,14 +316,15 @@ namespace Microsoft.Mixer
 
         internal void SetWebsocketInstance(Websocket newWebsocket)
         {
+#if !UNITY_WSA || UNITY_EDITOR
             _websocket = newWebsocket;
+#endif
         }
 
         private void InitiateConnection()
         {
             try
             {
-            string responseString = string.Empty;
                 mixerInteractiveHelper.OnInternalWebRequestStateChanged -= OnRequestWebSocketHostsCompleted;
                 mixerInteractiveHelper.OnInternalWebRequestStateChanged += OnRequestWebSocketHostsCompleted;
                 mixerInteractiveHelper.MakeWebRequest(
@@ -344,7 +345,9 @@ namespace Microsoft.Mixer
             {
                 PopulateConfigData();
             }
-#if UNITY_EDITOR || UNITY_STANDALONE
+#if UNITY_XBOXONE && !UNITY_EDITOR
+            ConnectToWebsocket();
+#else
             if (!string.IsNullOrEmpty(_authToken) ||
                 TryGetAuthTokensFromCache())
             {
@@ -355,8 +358,6 @@ namespace Microsoft.Mixer
                 // Show a shortCode
                 RefreshShortCode();
             }
-#elif UNITY_XBOXONE && !UNITY_EDITOR
-            ConnectToWebsocket();
 #endif
         }
 
@@ -752,7 +753,11 @@ namespace Microsoft.Mixer
             }
         }
 
+#if UNITY_WSA && !UNITY_EDITOR
+        private async void ConnectToWebsocket()
+#else
         private void ConnectToWebsocket()
+#endif
         {
             if (_pendingConnectToWebSocket || 
                 _websocketConnected)
@@ -772,6 +777,27 @@ namespace Microsoft.Mixer
                 ", OAuth Client ID: " + AppID + 
                 " and Auth Token: " + _authToken + ".");
 
+#if UNITY_WSA && !UNITY_EDITOR
+            try
+            {
+                _websocket.SetRequestHeader("Authorization", _authToken);
+                _websocket.SetRequestHeader("X-Interactive-Version", ProjectVersionID);
+                _websocket.SetRequestHeader("X-Protocol-Version", PROTOCOL_VERSION);
+                if (!string.IsNullOrEmpty(ShareCode))
+                {
+                    _websocket.SetRequestHeader("X-Interactive-Sharecode", ShareCode);
+                }
+
+                _websocket.MessageReceived += OnWebSocketMessage;
+                _websocket.Closed += OnWebSocketClose;
+                await _websocket.ConnectAsync(new Uri(_interactiveWebSocketUrl));
+                mixerInteractiveHelper.StopTimer(MixerInteractiveHelper.InteractiveTimerType.Reconnect);
+            }
+            catch (Exception ex)
+            {
+                LogError("Error: " + ex.Message);
+            }
+#else  
             Dictionary<string, string> headers = new Dictionary<string, string>();
             headers["Authorization"] = _authToken;
             headers["X-Interactive-Version"] = ProjectVersionID;
@@ -779,12 +805,13 @@ namespace Microsoft.Mixer
             {
                 headers["X-Interactive-Sharecode"] = ShareCode;
             }
-            headers["X-Protocol-Version"] = "2.0";
+            headers["X-Protocol-Version"] = PROTOCOL_VERSION;
             _websocket.OnOpen += OnWebsocketOpen;
             _websocket.OnMessage += OnWebSocketMessage;
             _websocket.OnError += OnWebSocketError;
             _websocket.OnClose += OnWebSocketClose;
             _websocket.Open(new Uri(_interactiveWebSocketUrl), headers);
+#endif
         }
 
         private void OnWebsocketOpen(object sender, EventArgs args)
@@ -792,9 +819,24 @@ namespace Microsoft.Mixer
             mixerInteractiveHelper.StopTimer(MixerInteractiveHelper.InteractiveTimerType.Reconnect);
         }
 
+#if UNITY_WSA && !UNITY_EDITOR
+        private void OnWebSocketMessage(MessageWebSocket sender, MessageWebSocketMessageReceivedEventArgs args)
+#else
         private void OnWebSocketMessage(object sender, MessageEventArgs args)
+#endif
         {
-            ProcessWebSocketMessage(args.Message);
+            string messageText = string.Empty;
+#if UNITY_WSA && !UNITY_EDITOR
+            if (args.MessageType == SocketMessageType.Utf8)
+            {
+                DataReader dataReader = args.GetDataReader();
+                string dataAsString = dataReader.ReadString(dataReader.UnconsumedBufferLength);
+                ProcessWebSocketMessage(dataAsString);
+            }
+#else
+            messageText = args.Message;
+#endif
+            ProcessWebSocketMessage(messageText);
         }
 
         private void OnWebSocketError(object sender, ErrorEventArgs args)
@@ -803,7 +845,11 @@ namespace Microsoft.Mixer
             LogError("Error: Websocket OnError: " + args.Message);
         }
 
+#if UNITY_WSA && !UNITY_EDITOR
+        private void OnWebSocketClose(IWebSocket sender, WebSocketClosedEventArgs args)
+#else
         private void OnWebSocketClose(object sender, CloseEventArgs args)
+#endif
         {
             UpdateInteractivityState(InteractivityState.InteractivityDisabled);
             if (args.Code == 4019)
@@ -917,7 +963,7 @@ namespace Microsoft.Mixer
             key = key.OpenSubKey(AppID + "-" + ProjectVersionID, true);
             _authToken = key.GetValue("MixerInteractive-AuthToken") as string;
             _oauthRefreshToken = key.GetValue("MixerInteractive-RefreshToken") as string;
-#elif UNITY_WSA
+#elif UNITY_WSA && !UNITY_EDITOR
             var localSettings = ApplicationData.Current.LocalSettings;
             if (localSettings.Values["MixerInteractive-AuthToken"] != null)
             {
@@ -948,10 +994,30 @@ namespace Microsoft.Mixer
             key = key.OpenSubKey(AppID + "-" + ProjectVersionID, true);
             key.SetValue("MixerInteractive-AuthToken", _authToken);
             key.SetValue("MixerInteractive-RefreshToken", _oauthRefreshToken);
-#elif UNITY_WSA
+#elif UNITY_WSA && !UNITY_EDITOR
             var localSettings = ApplicationData.Current.LocalSettings;
             localSettings.Values["Mixer-AuthToken"] = _authToken;
             localSettings.Values["Mixer-RefreshToken"] = _oauthRefreshToken;
+#endif
+        }
+
+        internal void RemoveAuthTokensFromCache()
+        {
+#if UNITY_EDITOR || UNITY_STANDALONE
+            RegistryKey key = Registry.CurrentUser.OpenSubKey("Software", true);
+            key.CreateSubKey("MixerInteractive");
+            key = key.OpenSubKey("MixerInteractive", true);
+            key.CreateSubKey("Configuration");
+            key = key.OpenSubKey("Configuration", true);
+            RegistryKey subKey = key.OpenSubKey(AppID + "-" + ProjectVersionID, true);
+            if (subKey != null)
+            {
+                key.DeleteSubKey(AppID + "-" + ProjectVersionID);
+            }
+#elif UNITY_WSA && !UNITY_EDITOR
+            var localSettings = ApplicationData.Current.LocalSettings;
+            localSettings.Values.Remove("Mixer-AuthToken");
+            localSettings.Values.Remove("Mixer-RefreshToken");
 #endif
         }
 
@@ -1220,11 +1286,17 @@ namespace Microsoft.Mixer
             mixerInteractiveHelper.Dispose();
             if (_websocket != null)
             {
+#if UNITY_WSA && !UNITY_EDITOR
+                _websocket.MessageReceived -= OnWebSocketMessage;
+                _websocket.Closed -= OnWebSocketClose;
+                _websocket.Close(0, "Dispose was called.");
+#else
                 _websocket.OnOpen -= OnWebsocketOpen;
                 _websocket.OnMessage -= OnWebSocketMessage;
                 _websocket.OnError -= OnWebSocketError;
                 _websocket.OnClose -= OnWebSocketClose;
                 _websocket.Close();
+#endif
             }
             _disposed = true;
         }
@@ -2962,20 +3034,34 @@ namespace Microsoft.Mixer
             _outstandingMessages.Add(messageID, method);
         }
 
+#if UNITY_WSA && !UNITY_EDITOR
+        private async void SendJsonString(string jsonString)
+#else
         private void SendJsonString(string jsonString)
+#endif
         {
             if (_websocket == null)
             {
                 return;
             }
+#if UNITY_WSA && !UNITY_EDITOR
+            _messageWriter.WriteString(jsonString);
+            await _messageWriter.StoreAsync();
+#else
             _websocket.Send(jsonString);
+#endif
             Log(jsonString);
         }
 
         List<InteractiveEventArgs> _queuedEvents = new List<InteractiveEventArgs>();
         Dictionary<uint, string> _outstandingMessages = new Dictionary<uint, string>();
 
+#if UNITY_WSA && !UNITY_EDITOR
+        MessageWebSocket _websocket;
+        DataWriter _messageWriter;
+#else
         Microsoft.Websocket _websocket;
+#endif
 
         private string _interactiveWebSocketUrl = string.Empty;
         private uint _currentmessageID = 1;
@@ -2989,7 +3075,6 @@ namespace Microsoft.Mixer
         private bool _websocketConnected = false;
         private bool _shouldStartInteractive = true;
         private string _streamingAssetsPath = string.Empty;
-        private string _websocketHostsJson = string.Empty;
 
         private List<InteractiveGroup> _groups;
         private List<InteractiveScene> _scenes;
@@ -3172,6 +3257,11 @@ namespace Microsoft.Mixer
             _streamingAssetsPath = Application.streamingAssetsPath;
 
             CreateStorageDirectoryIfNotExists();
+
+#if UNITY_WSA && !UNITY_EDITOR
+            _websocket = new MessageWebSocket();
+            _messageWriter = new DataWriter(_websocket.OutputStream);
+#endif
 
             mixerInteractiveHelper = MixerInteractiveHelper.SingletonInstance;
         }
