@@ -176,6 +176,40 @@ public class InteractiveSettingsWindow : EditorWindow
         }
 
         SectionSeperator();
+        
+        // Share code
+        EditorGUILayout.LabelField("Share Code", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("Share Codes allow anyone running this game to access your interactive project. It is ideal for large game studios when you don't want to manually give each person access. You can get a short code from Interactive Studio by clicking the Manage Share Settings icon.", EditorStyles.wordWrappedLabel);
+        EditorGUILayout.BeginHorizontal();
+        shareCode = EditorGUILayout.TextField("Share Code", shareCode);
+        if (GUILayout.Button("Save"))
+        {
+            if (!string.IsNullOrEmpty(appID) &&
+                !string.IsNullOrEmpty(projectVersionID) &&
+                shareCode != null) // We allow an empty Share Code, because that allows the developer to clear the Share Code.
+            {
+                WriteConfigFile();
+                EditorUtility.DisplayDialog("Share Code saved successfully", "Anyone running this game will now have access to the interactive project.", "Close");
+            }
+            else
+            {
+                EditorUtility.DisplayDialog("Error: Could not save project information", "The OAuth Client ID, Project Version ID and Share Code cannot be empty.", "Close");
+            }
+        }
+        EditorGUILayout.EndHorizontal();
+
+        SectionSeperator();
+
+        // Clear project information
+        EditorGUILayout.LabelField("Clear saved login information", EditorStyles.boldLabel);
+        EditorGUILayout.LabelField("Clearing authentication tokens will delete any cached tokens. This is useful if you want to do testing with a new Mixer account.", EditorStyles.wordWrappedLabel);
+        if (GUILayout.Button("Clear saved login information"))
+        {
+            shareCode = string.Empty;
+            RemoveSavedLoginInformation();
+        }
+
+        SectionSeperator();
 
         EditorGUILayout.LabelField("Log level", EditorStyles.boldLabel);
         EditorGUILayout.LabelField("Change the amount of informational logging from the Mixer SDK. The output will appear in the Unity Console.", EditorStyles.wordWrappedLabel);
@@ -202,41 +236,6 @@ public class InteractiveSettingsWindow : EditorWindow
                     break;
             }
             EditorPrefs.SetString("MixerInteractive_LoggingLevel", newLoggingLevel);
-        }
-
-        SectionSeperator();
-
-        // Share code
-        EditorGUILayout.LabelField("Share Code", EditorStyles.boldLabel);
-        EditorGUILayout.LabelField("Share Codes allow anyone running this game to access your interactive project. It is ideal for large game studios when you don't want to manually give each person access. You can get a short code from Interactive Studio by clicking the Manage Share Settings icon.", EditorStyles.wordWrappedLabel);
-        EditorGUILayout.BeginHorizontal();
-        shareCode = EditorGUILayout.TextField("Share Code", shareCode);
-        if (GUILayout.Button("Save"))
-        {
-            if (!string.IsNullOrEmpty(appID) &&
-                !string.IsNullOrEmpty(projectVersionID) &&
-                shareCode != null) // We allow an empty Share Code, because that allows the developer to clear the Share Code.
-            {
-                WriteConfigFile();
-                EditorUtility.DisplayDialog("Share Code saved successfully", "Anyone running this game will now have access to the interactive project.", "OK");
-            }
-            else
-            {
-                EditorUtility.DisplayDialog("Error: Could not save project information", "The OAuth Client ID, Project Version ID and Share Code cannot be empty.", "OK");
-            }
-        }
-        EditorGUILayout.EndHorizontal();
-
-        SectionSeperator();
-
-        // Clear project information
-        EditorGUILayout.LabelField("Clear saved login information", EditorStyles.boldLabel);
-        EditorGUILayout.LabelField("Clearing authentication tokens will delete any cached tokens. This is useful if you want to do testing with a new Mixer account.", EditorStyles.wordWrappedLabel);
-        if (GUILayout.Button("Clear saved login information"))
-        {
-            shareCode = string.Empty;
-            RemoveSavedLoginInformation();
-            EditorUtility.DisplayDialog("Login info cleared", "Your login information was cleared successfully. The next time you try to connect to interactive, you will be prompted to log in.", "OK");
         }
 
         SectionSeperator();
