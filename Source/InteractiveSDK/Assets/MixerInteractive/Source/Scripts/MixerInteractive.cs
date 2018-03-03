@@ -43,7 +43,6 @@ using System.Threading.Tasks;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.IO;
-using System.Collections;
 #endif
 
 public class MixerInteractive : MonoBehaviour
@@ -649,7 +648,9 @@ public class MixerInteractive : MonoBehaviour
     /// </summary>
     public static void ClearSavedLoginInformation()
     {
-        InteractivityManager.SingletonInstance.RemoveAuthTokensFromCache();
+        PlayerPrefs.DeleteKey("MixerInteractive-AuthToken");
+        PlayerPrefs.DeleteKey("MixerInteractive-RefreshToken");
+        PlayerPrefs.Save();
     }
 
     private IEnumerator InitializeCoRoutine()
