@@ -655,7 +655,7 @@ public class MixerInteractive : MonoBehaviour
 
     private IEnumerator InitializeCoRoutine()
     {
-        using (UnityWebRequest request = UnityWebRequest.Get("https://beam.pro/api/v1/interactive/hosts"))
+        using (UnityWebRequest request = UnityWebRequest.Get("https://mixer.com/api/v1/interactive/hosts"))
         {
             yield return request.SendWebRequest();
             if (request.isNetworkError)

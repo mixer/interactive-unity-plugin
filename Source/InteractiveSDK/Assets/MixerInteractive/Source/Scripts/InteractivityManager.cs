@@ -3083,7 +3083,7 @@ namespace Microsoft.Mixer
 
         MixerInteractiveHelper mixerInteractiveHelper;
 
-        private const string API_BASE = "https://beam.pro/api/v1/";
+        private const string API_BASE = "https://mixer.com/api/v1/";
         private const string WEBSOCKET_DISCOVERY_URL = API_BASE + "interactive/hosts";
         private const string API_CHECK_SHORT_CODE_AUTH_STATUS_PATH = API_BASE + "oauth/shortcode/check/";
         private const string API_GET_SHORT_CODE_PATH = API_BASE + "oauth/shortcode";
