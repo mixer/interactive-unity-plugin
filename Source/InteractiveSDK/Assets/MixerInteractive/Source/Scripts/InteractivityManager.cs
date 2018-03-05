@@ -42,9 +42,11 @@ using Windows.Web.Http;
 using System.Net.Http.Headers;
 using Windows.Data.Json;
 #endif
-#if UNITY_EDITOR || UNITY_STANDALONE || UNITY_IOS
+#if UNITY_EDITOR || UNITY_STANDALONE || UNITY_IOS || UNITY_ANDROID
 using System.Security.Cryptography.X509Certificates;
+using WebSocketSharp;
 using Microsoft.Win32;
+using System.Collections.Specialized;
 #endif
 #if UNITY_XBOXONE && !UNITY_EDITOR
 using System.Diagnostics;
@@ -278,6 +280,10 @@ namespace Microsoft.Mixer
             GCHandle pinnedMemory = GCHandle.Alloc(tokenData, GCHandleType.Pinned);
             System.IntPtr dataPointer = pinnedMemory.AddrOfPinnedObject();
             bool getXTokenSucceeded = MixerEraNativePlugin_GetXToken(dataPointer);
+            if (!getXTokenSucceeded)
+            {
+                LogError("Error: Could not get a Xbox Live token. Make sure you have a user signed in.");
+            }
             _authToken = Marshal.PtrToStringAnsi(dataPointer);
             pinnedMemory.Free();
 #endif
@@ -316,7 +322,7 @@ namespace Microsoft.Mixer
 
         internal void SetWebsocketInstance(Websocket newWebsocket)
         {
-#if !UNITY_WSA || UNITY_EDITOR
+#if UNITY_XBOXONE && !UNITY_EDITOR
             _websocket = newWebsocket;
 #endif
         }
@@ -348,8 +354,31 @@ namespace Microsoft.Mixer
 #if UNITY_XBOXONE && !UNITY_EDITOR
             ConnectToWebsocket();
 #else
-            if (!string.IsNullOrEmpty(_authToken) ||
-                TryGetAuthTokensFromCache())
+            if (!string.IsNullOrEmpty(_authToken))
+            {
+                VerifyAuthToken();
+            }
+            else
+            {
+                mixerInteractiveHelper.OnTryGetAuthTokensFromCacheCallback -= OnTryGetAuthTokensFromCacheCallback;
+                mixerInteractiveHelper.OnTryGetAuthTokensFromCacheCallback += OnTryGetAuthTokensFromCacheCallback;
+                mixerInteractiveHelper.StartTryGetAuthTokensFromCache();
+            }
+#endif
+        }
+
+        private void OnTryGetAuthTokensFromCacheCallback(object sender, MixerInteractiveHelper.TryGetAuthTokensFromCacheEventArgs e)
+        {
+            mixerInteractiveHelper.OnTryGetAuthTokensFromCacheCallback -= OnTryGetAuthTokensFromCacheCallback;
+            OnTryGetAuthTokensFromCacheCompleted(e);
+        }
+
+        private void OnTryGetAuthTokensFromCacheCompleted(MixerInteractiveHelper.TryGetAuthTokensFromCacheEventArgs e)
+        {
+            _authToken = e.AuthToken;
+            _oauthRefreshToken = e.RefreshToken;
+            // Try to see if we have a cached auth token
+            if (!string.IsNullOrEmpty(_authToken))
             {
                 VerifyAuthToken();
             }
@@ -358,7 +387,6 @@ namespace Microsoft.Mixer
                 // Show a shortCode
                 RefreshShortCode();
             }
-#endif
         }
 
         private void OnRequestWebSocketHostsCompleted(object sender, MixerInteractiveHelper.InternalWebRequestStateChangedEventArgs e)
@@ -583,7 +611,8 @@ namespace Microsoft.Mixer
             }
             _authToken = "Bearer " + accessToken;
             _oauthRefreshToken = refreshToken;
-            WriteAuthTokensToCache();
+
+            mixerInteractiveHelper.WriteAuthTokensToCache(_authToken, _oauthRefreshToken);
 
             Log("Retrieved a new OAuth token. Token: " + _authToken);
 
@@ -797,7 +826,7 @@ namespace Microsoft.Mixer
             {
                 LogError("Error: " + ex.Message);
             }
-#else  
+#elif UNITY_XBOXONE && !UNITY_EDITOR
             Dictionary<string, string> headers = new Dictionary<string, string>();
             headers["Authorization"] = _authToken;
             headers["X-Interactive-Version"] = ProjectVersionID;
@@ -811,6 +840,27 @@ namespace Microsoft.Mixer
             _websocket.OnError += OnWebSocketError;
             _websocket.OnClose += OnWebSocketClose;
             _websocket.Open(new Uri(_interactiveWebSocketUrl), headers);
+#else
+            _websocket = new WebSocket(_interactiveWebSocketUrl);
+
+            NameValueCollection headerCollection = new NameValueCollection();
+            headerCollection.Add("Authorization", _authToken);
+            headerCollection.Add("X-Interactive-Version", ProjectVersionID);
+            headerCollection.Add("X-Protocol-Version", PROTOCOL_VERSION);
+            if (!string.IsNullOrEmpty(ShareCode))
+            {
+                headerCollection.Add("X-Interactive-Sharecode", ShareCode);
+            }
+            _websocket.SetHeaders(headerCollection);
+
+            // Start a timer in case we never see the open event. WebSocketSharp
+            // doesn't properly expose connection errors.
+
+            _websocket.OnOpen += OnWebsocketOpen;
+            _websocket.OnMessage += OnWebSocketMessage;
+            _websocket.OnError += OnWebSocketError;
+            _websocket.OnClose += OnWebSocketClose;
+            _websocket.Connect();
 #endif
         }
 
@@ -821,8 +871,10 @@ namespace Microsoft.Mixer
 
 #if UNITY_WSA && !UNITY_EDITOR
         private void OnWebSocketMessage(MessageWebSocket sender, MessageWebSocketMessageReceivedEventArgs args)
+#elif UNITY_XBOXONE && !UNITY_EDITOR
+        private void OnWebSocketMessage(object sender, Microsoft.MessageEventArgs args)
 #else
-        private void OnWebSocketMessage(object sender, MessageEventArgs args)
+        private void OnWebSocketMessage(object sender, WebSocketSharp.MessageEventArgs args)
 #endif
         {
             string messageText = string.Empty;
@@ -833,13 +885,25 @@ namespace Microsoft.Mixer
                 string dataAsString = dataReader.ReadString(dataReader.UnconsumedBufferLength);
                 ProcessWebSocketMessage(dataAsString);
             }
-#else
+#elif UNITY_XBOXONE && !UNITY_EDITOR
             messageText = args.Message;
+#else
+            if (!args.IsText)
+            {
+                return;
+            }
+            messageText = args.Data;
 #endif
             ProcessWebSocketMessage(messageText);
         }
 
-        private void OnWebSocketError(object sender, ErrorEventArgs args)
+#if UNITY_WSA && !UNITY_EDITOR
+        private void OnWebSocketError(object sender, Microsoft.ErrorEventArgs args)
+#elif UNITY_XBOXONE && !UNITY_EDITOR
+        private void OnWebSocketError(object sender, Microsoft.ErrorEventArgs args)
+#else
+        private void OnWebSocketError(object sender, WebSocketSharp.ErrorEventArgs args)
+#endif
         {
             UpdateInteractivityState(InteractivityState.InteractivityDisabled);
             LogError("Error: Websocket OnError: " + args.Message);
@@ -847,8 +911,10 @@ namespace Microsoft.Mixer
 
 #if UNITY_WSA && !UNITY_EDITOR
         private void OnWebSocketClose(IWebSocket sender, WebSocketClosedEventArgs args)
+#elif UNITY_XBOXONE && !UNITY_EDITOR
+        private void OnWebSocketClose(object sender, Microsoft.CloseEventArgs args)
 #else
-        private void OnWebSocketClose(object sender, CloseEventArgs args)
+            private void OnWebSocketClose(object sender, WebSocketSharp.CloseEventArgs args)
 #endif
         {
             UpdateInteractivityState(InteractivityState.InteractivityDisabled);
@@ -945,80 +1011,9 @@ namespace Microsoft.Mixer
             }
             _authToken = "Bearer " + accessToken;
             _oauthRefreshToken = refreshToken;
-            WriteAuthTokensToCache();
+            mixerInteractiveHelper.WriteAuthTokensToCache(_authToken, _oauthRefreshToken);
 
             VerifyAuthToken();
-        }
-
-        private bool TryGetAuthTokensFromCache()
-        {
-            bool succeeded = false;
-#if UNITY_EDITOR || UNITY_STANDALONE
-            RegistryKey key = Registry.CurrentUser.OpenSubKey("Software", true);
-            key.CreateSubKey("MixerInteractive");
-            key = key.OpenSubKey("MixerInteractive", true);
-            key.CreateSubKey("Configuration");
-            key = key.OpenSubKey("Configuration", true);
-            key.CreateSubKey(AppID + "-" + ProjectVersionID);
-            key = key.OpenSubKey(AppID + "-" + ProjectVersionID, true);
-            _authToken = key.GetValue("MixerInteractive-AuthToken") as string;
-            _oauthRefreshToken = key.GetValue("MixerInteractive-RefreshToken") as string;
-#elif UNITY_WSA && !UNITY_EDITOR
-            var localSettings = ApplicationData.Current.LocalSettings;
-            if (localSettings.Values["MixerInteractive-AuthToken"] != null)
-            {
-                _authToken = localSettings.Values["MixerInteractive-AuthToken"].ToString();
-            }
-            if (localSettings.Values["MixerInteractive-RefreshToken"] != null)
-            {
-                _oauthRefreshToken = localSettings.Values["MixerInteractive-RefreshToken"].ToString();
-            }
-#endif
-            if (!string.IsNullOrEmpty(_authToken) &&
-                !string.IsNullOrEmpty(_oauthRefreshToken))
-            {
-                succeeded = true;
-            }
-            return succeeded;
-        }
-
-        private void WriteAuthTokensToCache()
-        {
-#if UNITY_EDITOR || UNITY_STANDALONE
-            RegistryKey key = Registry.CurrentUser.OpenSubKey("Software", true);
-            key.CreateSubKey("MixerInteractive");
-            key = key.OpenSubKey("MixerInteractive", true);
-            key.CreateSubKey("Configuration");
-            key = key.OpenSubKey("Configuration", true);
-            key.CreateSubKey(AppID + "-" + ProjectVersionID);
-            key = key.OpenSubKey(AppID + "-" + ProjectVersionID, true);
-            key.SetValue("MixerInteractive-AuthToken", _authToken);
-            key.SetValue("MixerInteractive-RefreshToken", _oauthRefreshToken);
-#elif UNITY_WSA && !UNITY_EDITOR
-            var localSettings = ApplicationData.Current.LocalSettings;
-            localSettings.Values["Mixer-AuthToken"] = _authToken;
-            localSettings.Values["Mixer-RefreshToken"] = _oauthRefreshToken;
-#endif
-        }
-
-        internal void RemoveAuthTokensFromCache()
-        {
-#if UNITY_EDITOR || UNITY_STANDALONE
-            RegistryKey key = Registry.CurrentUser.OpenSubKey("Software", true);
-            key.CreateSubKey("MixerInteractive");
-            key = key.OpenSubKey("MixerInteractive", true);
-            key.CreateSubKey("Configuration");
-            key = key.OpenSubKey("Configuration", true);
-            RegistryKey subKey = key.OpenSubKey(AppID + "-" + ProjectVersionID, true);
-            if (subKey != null)
-            {
-                key.DeleteSubKey(AppID + "-" + ProjectVersionID);
-            }
-#elif UNITY_WSA && !UNITY_EDITOR
-            var localSettings = ApplicationData.Current.LocalSettings;
-            localSettings.Values.Remove("Mixer-AuthToken");
-            localSettings.Values.Remove("Mixer-RefreshToken");
-#endif
         }
 
         private void UpdateInteractivityState(InteractivityState state)
@@ -1197,6 +1192,7 @@ namespace Microsoft.Mixer
             }
             // We send a ready message here, but wait for a response from the server before
             // setting the interactivity state to InteractivityEnabled.
+
             SendReady(true);
             _shouldStartInteractive = false;
             UpdateInteractivityState(InteractivityState.InteractivityPending);
@@ -3059,8 +3055,10 @@ namespace Microsoft.Mixer
 #if UNITY_WSA && !UNITY_EDITOR
         MessageWebSocket _websocket;
         DataWriter _messageWriter;
-#else
+#elif UNITY_XBOXONE && !UNITY_EDITOR
         Microsoft.Websocket _websocket;
+#else
+        WebSocketSharp.WebSocket _websocket;
 #endif
 
         private string _interactiveWebSocketUrl = string.Empty;
@@ -3294,7 +3292,7 @@ namespace Microsoft.Mixer
             {
                 return;
             }
-            Debug.Log(message);
+            UnityEngine.Debug.Log(message);
         }
 
         private void ClearPreviousControlState()

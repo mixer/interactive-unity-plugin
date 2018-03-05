@@ -47,10 +47,17 @@ internal class MixerInteractiveHelper: MonoBehaviour
     public delegate void OnInternalReconnectCallbackEventHandler(object sender, InternalTimerCallbackEventArgs e);
     public event OnInternalReconnectCallbackEventHandler OnInternalReconnectTimerCallback;
 
+    public delegate void OnTryGetAuthTokensFromCacheCallbackEventHandler(object sender, TryGetAuthTokensFromCacheEventArgs e);
+    public event OnTryGetAuthTokensFromCacheCallbackEventHandler OnTryGetAuthTokensFromCacheCallback;
+
     private List<InteractiveWebRequestData> _queuedWebRequests;
     private List<InteractiveTimerData> _queuedStartTimerRequests;
     private List<InteractiveTimerType> _queuedStopTimerRequests;
     private List<CoRoutineInfo> _runningCoRoutines;
+    private bool _queuedTryGetAuthTokensFromCacheRequest;
+    private bool _queuedWriteAuthTokensToCacheRequest;
+    private string _authTokenValueToWriteToCache;
+    private string _refreshTokenValueToWriteToCache;
 
     private static MixerInteractiveHelper _singletonInstance;
     internal static MixerInteractiveHelper SingletonInstance
@@ -141,6 +148,23 @@ internal class MixerInteractiveHelper: MonoBehaviour
                 }
             }
             _queuedStopTimerRequests.Clear();
+
+            if (_queuedTryGetAuthTokensFromCacheRequest)
+            {
+                TryGetAuthTokensFromCacheEventArgs tryGetAuthTokensFromCacheEventArgs = new TryGetAuthTokensFromCacheEventArgs();
+                tryGetAuthTokensFromCacheEventArgs.AuthToken = PlayerPrefs.GetString("MixerInteractive-AuthToken");
+                tryGetAuthTokensFromCacheEventArgs.RefreshToken = PlayerPrefs.GetString("MixerInteractive-RefreshToken");
+                if (OnTryGetAuthTokensFromCacheCallback != null)
+                {
+                    OnTryGetAuthTokensFromCacheCallback(this, tryGetAuthTokensFromCacheEventArgs);
+                }
+                _queuedTryGetAuthTokensFromCacheRequest = false;
+            }
+
+            if (_queuedWriteAuthTokensToCacheRequest)
+            {
+                WriteAuthTokensToCacheImpl();
+            }
         }
     }
 
@@ -280,6 +304,31 @@ internal class MixerInteractiveHelper: MonoBehaviour
 
     internal class InternalTimerCallbackEventArgs
     {
+    }
+
+    internal void StartTryGetAuthTokensFromCache()
+    {
+        _queuedTryGetAuthTokensFromCacheRequest = true;
+    }
+
+    internal class TryGetAuthTokensFromCacheEventArgs
+    {
+        public string AuthToken;
+        public string RefreshToken;
+    }
+
+    internal void WriteAuthTokensToCache(string authToken, string refreshToken)
+    {
+        _queuedWriteAuthTokensToCacheRequest = true;
+        _authTokenValueToWriteToCache = authToken;
+        _refreshTokenValueToWriteToCache = refreshToken;
+    }
+
+    private void WriteAuthTokensToCacheImpl()
+    {
+        PlayerPrefs.SetString("MixerInteractive-AuthToken", _authTokenValueToWriteToCache);
+        PlayerPrefs.SetString("MixerInteractive-RefreshToken", _refreshTokenValueToWriteToCache);
+        PlayerPrefs.Save();
     }
 
     private IEnumerator MakeWebRequestCoRoutine(
