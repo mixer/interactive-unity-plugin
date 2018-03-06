@@ -302,6 +302,26 @@ public class MixerInteractive : MonoBehaviour
     }
 
     /// <summary>
+    /// This method will give you the participant who gave input on the control. If there
+    /// was more than one user who gave input, it will return the first one.
+    /// </summary>
+    /// <returns>Returns the participant who gave input. Returns null if no participant gave input.</returns>
+    /// <param name="controlID">The ID of the control.</param>
+    /// <remarks></remarks>
+    public static InteractiveParticipant GetParticipantWhoGaveInputForControl(string controlID)
+    {
+        // Find which participant send the input for the given control.
+        InteractiveParticipant participant = null;
+        InternalParticipantTrackingState participantTrackingState = new InternalParticipantTrackingState();
+        bool participantTrackingStateEntryExists = InteractivityManager._participantsWhoTriggeredGiveInput.TryGetValue(controlID, out participantTrackingState);
+        if (participantTrackingStateEntryExists)
+        {
+            participant = participantTrackingState.particpant;
+        }
+        return participant;
+    }
+
+    /// <summary>
     /// Kicks off a background task to set up the connection to the interactivity service.
     /// </summary>
     /// <returns>true if initialization request was accepted, false if not</returns>

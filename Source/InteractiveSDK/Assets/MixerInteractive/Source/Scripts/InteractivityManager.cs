@@ -2319,10 +2319,9 @@ namespace Microsoft.Mixer
             }
             inputEvent.TransactionID = transactionID;
             InteractiveParticipant participant = ParticipantBySessionId(participantSessionID);
-            // The following allows the Unity Interactive Editor to simulate input.
-            if (useMockData && _participants.Count > 0)
+            if (!_participantsWhoTriggeredGiveInput.ContainsKey(inputEvent.controlID))
             {
-                participant = _participants[0];
+                _participantsWhoTriggeredGiveInput.Add(inputEvent.controlID, new InternalParticipantTrackingState(participant));
             }
             participant.LastInputAt = DateTime.UtcNow;
             if (inputEvent.Type == InteractiveEventType.Button)
@@ -3216,6 +3215,7 @@ namespace Microsoft.Mixer
         internal static Dictionary<uint, Dictionary<string, InternalButtonState>> _buttonStatesByParticipant;
         internal static Dictionary<string, InternalJoystickState> _joystickStates;
         internal static Dictionary<uint, Dictionary<string, InternalJoystickState>> _joystickStatesByParticipant;
+        internal static Dictionary<string, InternalParticipantTrackingState> _participantsWhoTriggeredGiveInput;
 
         // For MockData
         public static bool useMockData = false;
@@ -3254,6 +3254,8 @@ namespace Microsoft.Mixer
 
             _joystickStates = new Dictionary<string, InternalJoystickState>();
             _joystickStatesByParticipant = new Dictionary<uint, Dictionary<string, InternalJoystickState>>();
+
+            _participantsWhoTriggeredGiveInput = new Dictionary<string, InternalParticipantTrackingState>();
 
             _streamingAssetsPath = Application.streamingAssetsPath;
 
@@ -3353,6 +3355,19 @@ namespace Microsoft.Mixer
                     newButtonState.ButtonCountState = buttonCountState;
                     _buttonStatesByParticipant[key][controlKey] = newButtonState;
                 }
+            }
+
+            var controlIDKeys = new List<string>(_participantsWhoTriggeredGiveInput.Keys);
+            foreach (string controlIDKey in controlIDKeys)
+            {
+                InternalParticipantTrackingState oldParticipantTrackingState = _participantsWhoTriggeredGiveInput[controlIDKey];
+                InternalParticipantTrackingState newParticipantTrackingState = new InternalParticipantTrackingState();
+
+                newParticipantTrackingState.previousParticpant = oldParticipantTrackingState.particpant;
+                newParticipantTrackingState.particpant = oldParticipantTrackingState.nextParticpant;
+                newParticipantTrackingState.nextParticpant = null;
+
+                _participantsWhoTriggeredGiveInput[controlIDKey] = newParticipantTrackingState;
             }
         }
 
@@ -3544,5 +3559,18 @@ namespace Microsoft.Mixer
         internal double X;
         internal double Y;
         internal int countOfUniqueJoystickInputs;
+    }
+
+    internal struct InternalParticipantTrackingState
+    {
+        internal InteractiveParticipant previousParticpant;
+        internal InteractiveParticipant particpant;
+        internal InteractiveParticipant nextParticpant;
+        public InternalParticipantTrackingState(InteractiveParticipant newParticipant)
+        {
+            nextParticpant = newParticipant;
+            particpant = null;
+            previousParticpant = null;
+        }
     }
 }

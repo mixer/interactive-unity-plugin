@@ -23,6 +23,7 @@
  * DEALINGS IN THE SOFTWARE.
  */
 using Microsoft;
+using Microsoft.Mixer;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -30,6 +31,8 @@ namespace MixerInteractiveExamples
 {
     public class HealthValue : MonoBehaviour
     {
+        public Text healthText;
+        public Text viewerRecognitionText;
 
         // Use this for initialization
         void Start()
@@ -46,10 +49,17 @@ namespace MixerInteractiveExamples
             // the player's health by 1.
             if (MixerInteractive.GetButton("giveHealth"))
             {
-                var healthText = GetComponent<Text>();
                 int currentHealth = int.Parse(healthText.text);
                 currentHealth++;
                 healthText.text = currentHealth.ToString();
+
+                // It's always a good idea to recognize the viewer. They love seeing their name
+                // on the screen.
+                InteractiveParticipant participant = MixerInteractive.GetParticipantWhoGaveInputForControl("giveHealth");
+                if (participant != null)
+                {
+                    viewerRecognitionText.text = participant.UserName + " gave you health!";
+                }
             }
         }
     }
