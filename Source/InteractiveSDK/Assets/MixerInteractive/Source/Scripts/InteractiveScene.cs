@@ -72,7 +72,7 @@ namespace Microsoft.Mixer
             get
             {
                 List<InteractiveJoystickControl> joysticksInScene = new List<InteractiveJoystickControl>();
-                List<InteractiveJoystickControl> allJoysticks = InteractivityManager.SingletonInstance.Buttons as List<InteractiveJoystickControl>;
+                List<InteractiveJoystickControl> allJoysticks = InteractivityManager.SingletonInstance.Joysticks as List<InteractiveJoystickControl>;
                 foreach (InteractiveJoystickControl joystick in allJoysticks)
                 {
                     if (joystick.SceneID == SceneID)
