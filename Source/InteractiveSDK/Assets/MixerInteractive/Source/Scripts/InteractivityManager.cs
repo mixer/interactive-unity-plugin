@@ -1225,7 +1225,11 @@ namespace Microsoft.Mixer
         public void DoWork()
         {
             ClearPreviousControlState();
+            RaiseQueuedInteractiveEvents();
+        }
 
+        private void RaiseQueuedInteractiveEvents()
+        {
             // Go through all list of queued events and fire events.
             foreach (InteractiveEventArgs interactiveEvent in _queuedEvents.ToArray())
             {
@@ -3206,7 +3210,6 @@ namespace Microsoft.Mixer
 
         // Misc
         private const string PROTOCOL_VERSION = "2.0";
-        //private const int SECONDS_IN_A_MILLISECOND = 1000;
 
         // New data  structures
         internal static Dictionary<string, InternalButtonCountState> _buttonStates;
@@ -3301,6 +3304,7 @@ namespace Microsoft.Mixer
             {
                 return;
             }
+
             List<string> _buttonStatesKeys = new List<string>(_buttonStates.Keys);
             foreach (string key in _buttonStatesKeys)
             {
@@ -3318,6 +3322,10 @@ namespace Microsoft.Mixer
                 newButtonState.CountOfButtonUpEvents = oldButtonState.NextCountOfButtonUpEvents;
                 newButtonState.NextCountOfButtonUpEvents = 0;
 
+                newButtonState.PreviousTransactionID = oldButtonState.TransactionID;
+                newButtonState.TransactionID = oldButtonState.NextTransactionID;
+                newButtonState.NextTransactionID = string.Empty;
+
                 _buttonStates[key] = newButtonState;
             }
 
@@ -3327,23 +3335,23 @@ namespace Microsoft.Mixer
                 List<string> _buttonStatesByParticipantButtonStateKeys = new List<string>(_buttonStatesByParticipant[key].Keys);
                 foreach (string controlKey in _buttonStatesByParticipantButtonStateKeys)
                 {
-                    InternalButtonState oldButtonCountState = _buttonStatesByParticipant[key][controlKey];
-                    InternalButtonState newButtonCountState = new InternalButtonState();
+                    InternalButtonState oldButtonState = _buttonStatesByParticipant[key][controlKey];
+                    InternalButtonState newButtonState = new InternalButtonState();
                     InternalButtonCountState buttonCountState = new InternalButtonCountState();
-                    buttonCountState.PreviousCountOfButtonDownEvents = oldButtonCountState.ButtonCountState.CountOfButtonDownEvents;
-                    buttonCountState.CountOfButtonDownEvents = oldButtonCountState.ButtonCountState.NextCountOfButtonDownEvents;
+                    buttonCountState.PreviousCountOfButtonDownEvents = oldButtonState.ButtonCountState.CountOfButtonDownEvents;
+                    buttonCountState.CountOfButtonDownEvents = oldButtonState.ButtonCountState.NextCountOfButtonDownEvents;
                     buttonCountState.NextCountOfButtonDownEvents = 0;
 
-                    buttonCountState.PreviousCountOfButtonPressEvents = oldButtonCountState.ButtonCountState.CountOfButtonPressEvents;
-                    buttonCountState.CountOfButtonPressEvents = oldButtonCountState.ButtonCountState.NextCountOfButtonPressEvents;
+                    buttonCountState.PreviousCountOfButtonPressEvents = oldButtonState.ButtonCountState.CountOfButtonPressEvents;
+                    buttonCountState.CountOfButtonPressEvents = oldButtonState.ButtonCountState.NextCountOfButtonPressEvents;
                     buttonCountState.NextCountOfButtonPressEvents = 0;
 
-                    buttonCountState.PreviousCountOfButtonUpEvents = oldButtonCountState.ButtonCountState.CountOfButtonUpEvents;
-                    buttonCountState.CountOfButtonUpEvents = oldButtonCountState.ButtonCountState.NextCountOfButtonUpEvents;
+                    buttonCountState.PreviousCountOfButtonUpEvents = oldButtonState.ButtonCountState.CountOfButtonUpEvents;
+                    buttonCountState.CountOfButtonUpEvents = oldButtonState.ButtonCountState.NextCountOfButtonUpEvents;
                     buttonCountState.NextCountOfButtonUpEvents = 0;
 
-                    newButtonCountState.ButtonCountState = buttonCountState;
-                    _buttonStatesByParticipant[key][controlKey] = newButtonCountState;
+                    newButtonState.ButtonCountState = buttonCountState;
+                    _buttonStatesByParticipant[key][controlKey] = newButtonState;
                 }
             }
         }
@@ -3421,7 +3429,12 @@ namespace Microsoft.Mixer
             {
                 ButtonCountState.NextCountOfButtonUpEvents++;
             }
+            if (!string.IsNullOrEmpty(e.TransactionID))
+            {
+                ButtonCountState.NextTransactionID = e.TransactionID;
+            }
             newState.ButtonCountState = ButtonCountState;
+
             _buttonStatesByParticipant[participantId][controlID] = newState;
 
             // Populate button count state
@@ -3512,6 +3525,10 @@ namespace Microsoft.Mixer
         internal uint NextCountOfButtonDownEvents;
         internal uint NextCountOfButtonPressEvents;
         internal uint NextCountOfButtonUpEvents;
+
+        internal string PreviousTransactionID;
+        internal string TransactionID;
+        internal string NextTransactionID;
     }
 
     internal struct InternalButtonState

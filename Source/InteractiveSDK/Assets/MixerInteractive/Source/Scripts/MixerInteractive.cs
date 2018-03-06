@@ -279,6 +279,17 @@ public class MixerInteractive : MonoBehaviour
     }
 
     /// <summary>
+    /// By default the Unity SDK will automatically handle deducting sparks from users
+    /// when the GetButton* APIs are called and evaluate to true. If you would like to
+    /// manually handle spark transactions, you can set this value to false.
+    /// </summary>
+    public static bool ManuallyHandleSparkTransactions
+    {
+        get;
+        set;
+    }
+
+    /// <summary>
     /// The string the broadcaster needs to enter in the Mixer website to
     /// authorize the interactive session.
     /// </summary>
@@ -500,7 +511,13 @@ public class MixerInteractive : MonoBehaviour
     /// <param name="controlID">String ID of the control.</param>
     public static bool GetButtonDown(string controlID)
     {
-        return InteractivityManager.SingletonInstance.GetButton(controlID).ButtonDown;
+        bool buttonDown = InteractivityManager.SingletonInstance.GetButton(controlID).ButtonDown;
+        if (buttonDown &&
+            !ManuallyHandleSparkTransactions)
+        {
+            CaptureTransactionForButtonID(controlID);
+        }
+        return buttonDown;
     }
 
     /// <summary>
@@ -509,7 +526,13 @@ public class MixerInteractive : MonoBehaviour
     /// <param name="controlID">String ID of the control.</param>
     public static bool GetButton(string controlID)
     {
-        return InteractivityManager.SingletonInstance.GetButton(controlID).ButtonPressed;
+        bool buttonPressed = InteractivityManager.SingletonInstance.GetButton(controlID).ButtonPressed;
+        if (buttonPressed &&
+            !ManuallyHandleSparkTransactions)
+        {
+            CaptureTransactionForButtonID(controlID);
+        }
+        return buttonPressed;
     }
 
     /// <summary>
@@ -518,7 +541,13 @@ public class MixerInteractive : MonoBehaviour
     /// <param name="controlID">String ID of the control.</param>
     public static bool GetButtonUp(string controlID)
     {
-        return InteractivityManager.SingletonInstance.GetButton(controlID).ButtonUp;
+        bool buttonUp = InteractivityManager.SingletonInstance.GetButton(controlID).ButtonUp;
+        if (buttonUp &&
+            !ManuallyHandleSparkTransactions)
+        {
+            CaptureTransactionForButtonID(controlID);
+        }
+        return buttonUp;
     }
 
     /// <summary>
@@ -925,6 +954,22 @@ public class MixerInteractive : MonoBehaviour
         return token;
     }
 #endif
+
+    private static void CaptureTransactionForButtonID(string controlID)
+    {
+        var buttons = Buttons;
+        var buttonStateKeys = InteractivityManager._buttonStates.Keys;
+        foreach (string buttonStateKey in buttonStateKeys)
+        {
+            if (buttonStateKey == controlID)
+            {
+                InteractivityManager.SingletonInstance.CaptureTransaction(
+                    InteractivityManager._buttonStates[buttonStateKey].TransactionID
+                    );
+                break;
+            }
+        }
+    }
 
     void OnDestroy()
     {
