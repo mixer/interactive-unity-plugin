@@ -61,6 +61,9 @@ namespace Microsoft.Mixer
 
         internal string ETag;
         internal string SceneID;
+        internal string Kind;
+        internal InteractiveEventType Type;
+        internal int participantID;
 
         /// <summary>
         /// Allow game client to disable a control.
@@ -88,13 +91,16 @@ namespace Microsoft.Mixer
             InteractivityManager.SingletonInstance.QueuePropertyUpdate(SceneID, ControlID, name, value);
         }
 
-        internal InteractiveControl(string controlID, bool disabled, string helpText, string eTag, string sceneID)
+        internal InteractiveControl(string controlID, string kind, InteractiveEventType type, bool disabled, string helpText, string eTag, string sceneID)
         {
             ControlID = controlID;
+            Kind = kind;
+            Type = type;
             Disabled = disabled;
             HelpText = helpText;
             ETag = eTag;
             SceneID = sceneID;
+            participantID = -1;
         }
     }
 }
