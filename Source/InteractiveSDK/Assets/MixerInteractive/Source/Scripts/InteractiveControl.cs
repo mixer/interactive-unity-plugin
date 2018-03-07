@@ -78,6 +78,16 @@ namespace Microsoft.Mixer
                 0);
         }
 
+        /// <summary>
+        /// This function allows you to set any property on a control.
+        /// </summary>
+        /// <param name="name">The name of the control property.</param>
+        /// <param name="value">The value of the control property.</param>
+        public void SetProperty(string name, object value)
+        {
+            InteractivityManager.SingletonInstance.QueuePropertyUpdate(SceneID, ControlID, name, value);
+        }
+
         internal InteractiveControl(string controlID, bool disabled, string helpText, string eTag, string sceneID)
         {
             ControlID = controlID;

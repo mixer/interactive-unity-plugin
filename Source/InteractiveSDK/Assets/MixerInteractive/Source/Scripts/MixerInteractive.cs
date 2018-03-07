@@ -720,6 +720,16 @@ public class MixerInteractive : MonoBehaviour
     }
 
     /// <summary>
+    /// This method returns a control matching the given ID.
+    /// </summary>
+    /// <param name="controlID">The ID of the control.</param>
+    /// <returns>Returns the interactive control matching the given ID.</returns>
+    public static InteractiveControl GetControl(string controlID)
+    {
+        return InteractivityManager.SingletonInstance.GetControl(controlID);
+    }
+
+    /// <summary>
     /// Connects to the interactivity service and signals the service that the InteractivityManager is ready to recieve messages.
     /// It also, handles signals authentication events if necessary.
     /// </summary>
