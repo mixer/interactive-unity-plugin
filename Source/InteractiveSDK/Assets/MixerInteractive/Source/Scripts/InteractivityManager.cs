@@ -707,7 +707,7 @@ namespace Microsoft.Mixer
             }
             mixerInteractiveHelper.OnInternalRefreshShortCodeTimerCallback += OnInternalRefreshShortCodeTimerCallback;
             mixerInteractiveHelper.StartTimer(
-                MixerInteractiveHelper.InteractiveTimerType.RefreshShortCode, 
+                MixerInteractiveHelper.InteractiveTimerType.RefreshShortCode,
                 shortCodeExpirationTime
                 );
 
@@ -788,7 +788,7 @@ namespace Microsoft.Mixer
         private void ConnectToWebsocket()
 #endif
         {
-            if (_pendingConnectToWebSocket || 
+            if (_pendingConnectToWebSocket ||
                 _websocketConnected)
             {
                 return;
@@ -801,9 +801,9 @@ namespace Microsoft.Mixer
             {
                 shareCodeDebugLogString = ", Share Code: " + ShareCode;
             }
-            Log("Connecting to websocket with Project Version ID: " + ProjectVersionID + 
-                shareCodeDebugLogString + 
-                ", OAuth Client ID: " + AppID + 
+            Log("Connecting to websocket with Project Version ID: " + ProjectVersionID +
+                shareCodeDebugLogString +
+                ", OAuth Client ID: " + AppID +
                 " and Auth Token: " + _authToken + ".");
 
 #if UNITY_WSA && !UNITY_EDITOR
@@ -914,7 +914,7 @@ namespace Microsoft.Mixer
 #elif UNITY_XBOXONE && !UNITY_EDITOR
         private void OnWebSocketClose(object sender, Microsoft.CloseEventArgs args)
 #else
-            private void OnWebSocketClose(object sender, WebSocketSharp.CloseEventArgs args)
+        private void OnWebSocketClose(object sender, WebSocketSharp.CloseEventArgs args)
 #endif
         {
             UpdateInteractivityState(InteractivityState.InteractivityDisabled);
@@ -953,11 +953,11 @@ namespace Microsoft.Mixer
             mixerInteractiveHelper.OnInternalWebRequestStateChanged += OnRequestRefreshedAuthTokenCompleted;
             mixerInteractiveHelper.MakeWebRequest(
                 "OnRequestRefreshedAuthTokenCompleted",
-                API_GET_OAUTH_TOKEN_PATH, 
+                API_GET_OAUTH_TOKEN_PATH,
                 new Dictionary<string, string>()
                 {
                     { "Content-Type", "application/json" }
-                }, 
+                },
                 "POST",
                 postData
             );
@@ -1205,7 +1205,7 @@ namespace Microsoft.Mixer
         /// <remarks></remarks>
         public void StopInteractive()
         {
-            if (InteractivityState == InteractivityState.NotInitialized || 
+            if (InteractivityState == InteractivityState.NotInitialized ||
                 InteractivityState == InteractivityState.InteractivityDisabled)
             {
                 return;
@@ -1226,6 +1226,7 @@ namespace Microsoft.Mixer
         {
             ClearPreviousControlState();
             RaiseQueuedInteractiveEvents();
+            SendQueuedSetControlPropertyUpdates();
         }
 
         private void RaiseQueuedInteractiveEvents()
@@ -1274,6 +1275,56 @@ namespace Microsoft.Mixer
                 }
             }
             _queuedEvents.Clear();
+        }
+
+        public void SendQueuedSetControlPropertyUpdates()
+        {
+            var sceneKeys = _queuedControlPropertyUpdates.Keys;
+            foreach (string sceneID in sceneKeys)
+            {
+                // Send an update control message
+                var messageID = _currentmessageID++;
+                StringBuilder stringBuilder = new StringBuilder();
+                StringWriter stringWriter = new StringWriter(stringBuilder);
+                using (JsonWriter jsonWriter = new JsonTextWriter(stringWriter))
+                {
+                    jsonWriter.WriteStartObject();
+                    jsonWriter.WritePropertyName(WS_MESSAGE_KEY_TYPE);
+                    jsonWriter.WriteValue(WS_MESSAGE_TYPE_METHOD);
+                    jsonWriter.WritePropertyName(WS_MESSAGE_KEY_ID);
+                    jsonWriter.WriteValue(messageID);
+                    jsonWriter.WritePropertyName(WS_MESSAGE_TYPE_METHOD);
+                    jsonWriter.WriteValue(WS_MESSAGE_METHOD_UPDATE_CONTROLS);
+                    jsonWriter.WritePropertyName(WS_MESSAGE_KEY_PARAMETERS);
+                    jsonWriter.WriteStartObject();
+                    jsonWriter.WritePropertyName(WS_MESSAGE_KEY_SCENE_ID);
+                    jsonWriter.WriteValue(sceneID);
+                    jsonWriter.WritePropertyName(WS_MESSAGE_KEY_CONTROLS);
+                    jsonWriter.WriteStartArray();
+
+                    var controlIDs  = _queuedControlPropertyUpdates[sceneID].Keys;
+                    foreach (string controlID in controlIDs)
+                    {
+                        jsonWriter.WriteStartObject();
+                        jsonWriter.WritePropertyName(WS_MESSAGE_KEY_CONTROL_ID);
+                        jsonWriter.WriteValue(controlID);
+                        Dictionary<string, object> controlPropertyData = _queuedControlPropertyUpdates[sceneID][controlID].properties;
+                        var controlPropertyDataKeys = controlPropertyData.Keys;
+                        foreach (string controlPropertyDataKey in controlPropertyDataKeys)
+                        {
+                            jsonWriter.WritePropertyName(controlPropertyDataKey);
+                            jsonWriter.WriteValue(controlPropertyData[controlPropertyDataKey].ToString());
+                        }
+                        jsonWriter.WriteEndObject();
+                    }
+                    jsonWriter.WriteEndArray();
+                    jsonWriter.WriteEndObject();
+                    jsonWriter.WriteEnd();
+                    SendJsonString(stringWriter.ToString());
+                }
+                _outstandingMessages.Add(messageID, WS_MESSAGE_METHOD_UPDATE_CONTROLS);
+            }
+            _queuedControlPropertyUpdates.Clear();
         }
 
         public void Dispose()
@@ -3216,6 +3267,7 @@ namespace Microsoft.Mixer
         internal static Dictionary<string, InternalJoystickState> _joystickStates;
         internal static Dictionary<uint, Dictionary<string, InternalJoystickState>> _joystickStatesByParticipant;
         internal static Dictionary<string, InternalParticipantTrackingState> _participantsWhoTriggeredGiveInput;
+        private static Dictionary<string, Dictionary<string, InternalControlPropertyUpdateData>> _queuedControlPropertyUpdates;
 
         // For MockData
         public static bool useMockData = false;
@@ -3256,6 +3308,7 @@ namespace Microsoft.Mixer
             _joystickStatesByParticipant = new Dictionary<uint, Dictionary<string, InternalJoystickState>>();
 
             _participantsWhoTriggeredGiveInput = new Dictionary<string, InternalParticipantTrackingState>();
+            _queuedControlPropertyUpdates = new Dictionary<string, Dictionary<string, InternalControlPropertyUpdateData>>();
 
             _streamingAssetsPath = Application.streamingAssetsPath;
 
@@ -3525,6 +3578,41 @@ namespace Microsoft.Mixer
                 (e.Y * (1 / countOfUniqueJoystickInputs));
             _joystickStates[e.ControlID] = newJoystickState;
         }
+
+        internal void QueuePropertyUpdate(string sceneID, string controlID, string name, object value)
+        {
+            // If a scene entry doesn't exist, add one.
+            if (!_queuedControlPropertyUpdates.ContainsKey(sceneID))
+            {
+                InternalControlPropertyUpdateData controlPropertyData = new InternalControlPropertyUpdateData(name, value);
+                Dictionary<string, InternalControlPropertyUpdateData> controlData = new Dictionary<string, InternalControlPropertyUpdateData>();
+                controlData.Add(controlID, controlPropertyData);
+                _queuedControlPropertyUpdates.Add(sceneID, controlData);
+            }
+            else
+            {
+                // Scene exists, but if control entry doesn't exist, create one.
+                Dictionary<string, InternalControlPropertyUpdateData> controlData = _queuedControlPropertyUpdates[sceneID];
+                if (!controlData.ContainsKey(controlID))
+                {
+                    InternalControlPropertyUpdateData controlPropertyData = new InternalControlPropertyUpdateData(name, value);
+                    _queuedControlPropertyUpdates[sceneID].Add(controlID, controlPropertyData);
+                }
+                else
+                {
+                    // Control entry exists, but does property entry exist?
+                    InternalControlPropertyUpdateData controlPropertyData = controlData[controlID];
+                    if (!controlPropertyData.properties.ContainsKey(name))
+                    {
+                        _queuedControlPropertyUpdates[sceneID][controlID].properties.Add(name, value);
+                    }
+                    else
+                    {
+                        _queuedControlPropertyUpdates[sceneID][controlID].properties[name] = value;
+                    }
+                }
+            }
+        }
     }
 
     internal struct InternalButtonCountState
@@ -3571,6 +3659,16 @@ namespace Microsoft.Mixer
             nextParticpant = newParticipant;
             particpant = null;
             previousParticpant = null;
+        }
+    }
+
+    internal struct InternalControlPropertyUpdateData
+    {
+        internal Dictionary<string, object> properties;
+        public InternalControlPropertyUpdateData(string name, object value)
+        {
+            properties = new Dictionary<string, object>();
+            properties.Add(name, value);
         }
     }
 }
