@@ -2136,11 +2136,11 @@ namespace Microsoft.Mixer
             }
             if (kind == WS_MESSAGE_VALUE_CONTROL_TYPE_BUTTON)
             {
-                newControl = new InteractiveButtonControl(controlID, disabled, helpText, cost, eTag, sceneID);
+                newControl = new InteractiveButtonControl(controlID, InteractiveEventType.Button, disabled, helpText, cost, eTag, sceneID);
             }
             else if (kind == WS_MESSAGE_VALUE_CONTROL_TYPE_JOYSTICK)
             {
-                newControl = new InteractiveJoystickControl(controlID, disabled, helpText, eTag, sceneID);
+                newControl = new InteractiveJoystickControl(controlID, InteractiveEventType.Joystick, disabled, helpText, eTag, sceneID);
             }
             else
             {
@@ -2637,7 +2637,7 @@ namespace Microsoft.Mixer
 
         internal InteractiveJoystickControl GetJoystick(string controlID, uint userID)
         {
-            InteractiveJoystickControl joystick = new InteractiveJoystickControl(controlID, true, string.Empty, string.Empty, string.Empty);
+            InteractiveJoystickControl joystick = new InteractiveJoystickControl(controlID, InteractiveEventType.Joystick, true, string.Empty, string.Empty, string.Empty);
             var joysticks = Joysticks;
             foreach (InteractiveJoystickControl potential in joysticks)
             {
@@ -2713,7 +2713,7 @@ namespace Microsoft.Mixer
         /// <returns></returns>
         public InteractiveButtonControl GetButton(string controlID)
         {
-            InteractiveButtonControl buttonControl = new InteractiveButtonControl(controlID, false, string.Empty, 0, string.Empty, string.Empty);
+            InteractiveButtonControl buttonControl = new InteractiveButtonControl(controlID, InteractiveEventType.Button, false, string.Empty, 0, string.Empty, string.Empty);
             var buttons = Buttons;
             foreach (InteractiveButtonControl currentButtonControl in buttons)
             {
@@ -2733,7 +2733,7 @@ namespace Microsoft.Mixer
         /// <returns></returns>
         public InteractiveJoystickControl GetJoystick(string controlID)
         {
-            InteractiveJoystickControl joystickControl = new InteractiveJoystickControl(controlID, true, "", "", "");
+            InteractiveJoystickControl joystickControl = new InteractiveJoystickControl(controlID, InteractiveEventType.Joystick, true, "", "", "");
             var joysticks = Joysticks;
             foreach (InteractiveJoystickControl currentJoystick in joysticks)
             {
@@ -3346,8 +3346,8 @@ namespace Microsoft.Mixer
         private const string WS_MESSAGE_ERROR = "error";
 
         // Input
-        private const string CONTROL_TYPE_BUTTON = "button";
-        private const string CONTROL_TYPE_JOYSTICK = "joystick";
+        internal const string CONTROL_TYPE_BUTTON = "button";
+        internal const string CONTROL_TYPE_JOYSTICK = "joystick";
 
         // Event names
         private const string EVENT_NAME_MOUSE_DOWN = "mousedown";
