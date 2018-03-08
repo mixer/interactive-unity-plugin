@@ -1603,8 +1603,6 @@ namespace Microsoft.Mixer
             {
                 UpdateInteractivityState(InteractivityState.InteractivityEnabled);
             }
-            //SendGetAllGroupsMessage();
-            //SendGetAllScenesMessage();
         }
 
         private void HandleControlUpdate(JsonReader jsonReader)
@@ -2138,15 +2136,15 @@ namespace Microsoft.Mixer
             }
             if (kind == WS_MESSAGE_VALUE_CONTROL_TYPE_BUTTON)
             {
-                newControl = new InteractiveButtonControl(controlID, disabled, helpText, cost, eTag, sceneID);
+                newControl = new InteractiveButtonControl(controlID, InteractiveEventType.Button, disabled, helpText, cost, eTag, sceneID);
             }
             else if (kind == WS_MESSAGE_VALUE_CONTROL_TYPE_JOYSTICK)
             {
-                newControl = new InteractiveJoystickControl(controlID, disabled, helpText, eTag, sceneID);
+                newControl = new InteractiveJoystickControl(controlID, InteractiveEventType.Joystick, disabled, helpText, eTag, sceneID);
             }
             else
             {
-                newControl = new InteractiveControl(controlID, disabled, helpText, eTag, sceneID);
+                newControl = new InteractiveControl(controlID, kind, InteractiveEventType.Unknown, disabled, helpText, eTag, sceneID);
             }
             return newControl;
         }
@@ -2168,7 +2166,9 @@ namespace Microsoft.Mixer
         {
             int startDepth = jsonReader.Depth;
             string controlID = string.Empty;
-            InteractiveEventType type = InteractiveEventType.Button;
+            string eventName = string.Empty;
+            string kind = string.Empty;
+            object rawValue = null;
             bool isPressed = false;
             float x = 0;
             float y = 0;
@@ -2190,10 +2190,9 @@ namespace Microsoft.Mixer
                                 break;
                             case WS_MESSAGE_KEY_EVENT:
                                 string eventValue = jsonReader.ReadAsString();
-                                if (eventValue == "mousedown" || eventValue == "mouseup")
+                                if (eventValue == EVENT_NAME_MOUSE_DOWN || eventValue == EVENT_NAME_MOUSE_UP)
                                 {
-                                    type = InteractiveEventType.Button;
-                                    if (eventValue == "mousedown")
+                                    if (eventValue == EVENT_NAME_MOUSE_DOWN)
                                     {
                                         isPressed = true;
                                     }
@@ -2202,10 +2201,6 @@ namespace Microsoft.Mixer
                                         isPressed = false;
                                     }
                                 }
-                                else if (eventValue == "move")
-                                {
-                                    type = InteractiveEventType.Joystick;
-                                }
                                 break;
                             case WS_MESSAGE_KEY_X:
                                 x = (float)jsonReader.ReadAsDouble();
@@ -2213,9 +2208,26 @@ namespace Microsoft.Mixer
                             case WS_MESSAGE_KEY_Y:
                                 y = (float)jsonReader.ReadAsDouble();
                                 break;
+                            case WS_MESSAGE_KEY_KIND:
+                                jsonReader.Read();
+                                kind = jsonReader.Value.ToString();
+                                break;
+                            case WS_MESSAGE_KEY_VALUE:
+                                jsonReader.Read();
+                                rawValue = jsonReader.Value;
+                                break;
                             default:
                                 // No-op
                                 break;
+                        }
+                        // Look for any other values the developer has asked us to track.
+                        var keys = _giveInputKeyValues.Keys;
+                        foreach (string key in keys)
+                        {
+                            if (key == keyValue)
+                            {
+                                _giveInputKeyValues[key] = rawValue;
+                            }
                         }
                     }
                 }
@@ -2225,12 +2237,14 @@ namespace Microsoft.Mixer
                 LogError("Error: Error reading input from control " + controlID + ".");
             }
             uint cost = 0;
-            var button = ControlFromControlID(controlID) as InteractiveButtonControl;
+            InteractiveControl control = ControlFromControlID(controlID);
+            InteractiveButtonControl button = control as InteractiveButtonControl;
             if (button != null)
             {
                 cost = button.Cost;
             }
-            return new InputEvent(controlID, type, isPressed, x, y, cost, "");
+            InteractiveEventType controlType = InteractiveEventTypeFromID(controlID);
+            return new InputEvent(controlID, control.Kind, eventName, controlType, isPressed, x, y, cost, string.Empty, rawValue);
         }
 
         private void HandleParticipantJoin(JsonReader jsonReader)
@@ -2319,23 +2333,42 @@ namespace Microsoft.Mixer
         }
         internal struct InputEvent
         {
-            internal string controlID;
+            internal string ControlID;
+            internal string Kind;
+            internal string Event;
+            // Type is a legacy field. For future controls,
+            // use the kind property.
             internal InteractiveEventType Type;
             internal uint Cost;
             internal bool IsPressed;
             internal string TransactionID;
             internal float X;
             internal float Y;
+            object Value;
 
-            internal InputEvent(string cntrlID, InteractiveEventType type, bool isPressed, float x, float y, uint cost, string transactionID)
+            internal InputEvent(
+                string controlID,
+                string kind,
+                string eventName,
+                InteractiveEventType type, 
+                bool isPressed, 
+                float x, 
+                float y, 
+                uint cost, 
+                string transactionID,
+                object value
+                )
             {
-                controlID = cntrlID;
+                ControlID = controlID;
+                Kind = kind;
+                Event = eventName;
                 Type = type;
                 Cost = cost;
                 TransactionID = transactionID;
                 IsPressed = isPressed;
                 X = x;
                 Y = y;
+                Value = value;
             }
         };
 
@@ -2370,22 +2403,75 @@ namespace Microsoft.Mixer
             }
             inputEvent.TransactionID = transactionID;
             InteractiveParticipant participant = ParticipantBySessionId(participantSessionID);
-            if (!_participantsWhoTriggeredGiveInput.ContainsKey(inputEvent.controlID))
+            if (!_participantsWhoTriggeredGiveInput.ContainsKey(inputEvent.ControlID))
             {
-                _participantsWhoTriggeredGiveInput.Add(inputEvent.controlID, new InternalParticipantTrackingState(participant));
+                _participantsWhoTriggeredGiveInput.Add(inputEvent.ControlID, new InternalParticipantTrackingState(participant));
             }
             participant.LastInputAt = DateTime.UtcNow;
             if (inputEvent.Type == InteractiveEventType.Button)
             {
-                InteractiveButtonEventArgs eventArgs = new InteractiveButtonEventArgs(inputEvent.Type, inputEvent.controlID, participant, inputEvent.IsPressed, inputEvent.Cost, inputEvent.TransactionID);
+                InteractiveButtonEventArgs eventArgs = new InteractiveButtonEventArgs(inputEvent.Type, inputEvent.ControlID, participant, inputEvent.IsPressed, inputEvent.Cost, inputEvent.TransactionID);
                 _queuedEvents.Add(eventArgs);
                 UpdateInternalButtonState(eventArgs);
             }
             else if (inputEvent.Type == InteractiveEventType.Joystick)
             {
-                InteractiveJoystickEventArgs eventArgs = new InteractiveJoystickEventArgs(inputEvent.Type, inputEvent.controlID, participant, inputEvent.X, inputEvent.Y);
+                InteractiveJoystickEventArgs eventArgs = new InteractiveJoystickEventArgs(inputEvent.Type, inputEvent.ControlID, participant, inputEvent.X, inputEvent.Y);
                 _queuedEvents.Add(eventArgs);
                 UpdateInternalJoystickState(eventArgs);
+            }
+
+            uint participantID = participant.UserID;
+
+            // Put the input key values in the control data structure.
+            string controlID = inputEvent.ControlID;
+            string controlType = inputEvent.Kind;
+            Dictionary<string, object> controlData = new Dictionary<string, object>();
+            if (_giveInputControlData.TryGetValue(controlID, out controlData))
+            {
+                var controlDataKeys = controlData.Keys;
+                foreach (string key in controlDataKeys)
+                {
+                    object value = null;
+                    if (_giveInputKeyValues.TryGetValue(key, out value))
+                    {
+                        controlData[key] = value;
+                    }
+                }
+                _giveInputControlData[controlID] = controlData;
+            }
+            else
+            {
+                _giveInputControlData[controlID] = new Dictionary<string, object>();
+            }
+
+            // Update the by participant data structure.
+            Dictionary<uint, Dictionary<string, object>> controlDataByParticipant = new Dictionary<uint, Dictionary<string, object>>();
+            if (_giveInputControlDataByParticipant.TryGetValue(controlType, out controlDataByParticipant))
+            {
+                Dictionary<string, object> controlValues = new Dictionary<string, object>();
+                if (controlDataByParticipant.TryGetValue(participantID, out controlValues))
+                {
+                    var controlDataKeys = controlValues.Keys;
+                    foreach (string key in controlDataKeys)
+                    {
+                        object value = null;
+                        if (_giveInputKeyValues.TryGetValue(key, out value))
+                        {
+                            controlValues[key] = value;
+                        }
+                    }
+                    controlDataByParticipant[participantID] = controlValues;
+                }
+                else
+                {
+                    controlValues = new Dictionary<string, object>();
+                }
+                _giveInputControlDataByParticipant[controlType] = controlDataByParticipant;
+            }
+            else
+            {
+                _giveInputControlDataByParticipant[controlType] = new Dictionary<uint, Dictionary<string, object>>();
             }
         }
 
@@ -2551,7 +2637,7 @@ namespace Microsoft.Mixer
 
         internal InteractiveJoystickControl GetJoystick(string controlID, uint userID)
         {
-            InteractiveJoystickControl joystick = new InteractiveJoystickControl(controlID, true, string.Empty, string.Empty, string.Empty);
+            InteractiveJoystickControl joystick = new InteractiveJoystickControl(controlID, InteractiveEventType.Joystick, true, string.Empty, string.Empty, string.Empty);
             var joysticks = Joysticks;
             foreach (InteractiveJoystickControl potential in joysticks)
             {
@@ -2607,7 +2693,7 @@ namespace Microsoft.Mixer
 
         internal InteractiveControl GetControl(string controlID)
         {
-            InteractiveControl control = new InteractiveControl(controlID, true, "", "", "");
+            InteractiveControl control = new InteractiveControl(controlID, "", InteractiveEventType.Unknown, true, "", "", "");
             var controls = Controls;
             foreach (InteractiveControl currentControl in controls)
             {
@@ -2627,7 +2713,7 @@ namespace Microsoft.Mixer
         /// <returns></returns>
         public InteractiveButtonControl GetButton(string controlID)
         {
-            InteractiveButtonControl buttonControl = new InteractiveButtonControl(controlID, false, string.Empty, 0, string.Empty, string.Empty);
+            InteractiveButtonControl buttonControl = new InteractiveButtonControl(controlID, InteractiveEventType.Button, false, string.Empty, 0, string.Empty, string.Empty);
             var buttons = Buttons;
             foreach (InteractiveButtonControl currentButtonControl in buttons)
             {
@@ -2647,7 +2733,7 @@ namespace Microsoft.Mixer
         /// <returns></returns>
         public InteractiveJoystickControl GetJoystick(string controlID)
         {
-            InteractiveJoystickControl joystickControl = new InteractiveJoystickControl(controlID, true, "", "", "");
+            InteractiveJoystickControl joystickControl = new InteractiveJoystickControl(controlID, InteractiveEventType.Joystick, true, "", "", "");
             var joysticks = Joysticks;
             foreach (InteractiveJoystickControl currentJoystick in joysticks)
             {
@@ -2716,6 +2802,20 @@ namespace Microsoft.Mixer
                 }
             }
             return target;
+        }
+
+        private InteractiveEventType InteractiveEventTypeFromID(string controlID)
+        {
+            InteractiveEventType type = InteractiveEventType.Unknown;
+            foreach (var control in _controls)
+            {
+                if (controlID == control.ControlID)
+                {
+                    type = control.Type;
+                    break;
+                }
+            }
+            return type;
         }
 
         // Private methods to send WebSocket messages
@@ -3195,6 +3295,7 @@ namespace Microsoft.Mixer
         private const string WS_MESSAGE_KEY_TYPE = "type";
         private const string WS_MESSAGE_KEY_USER_ID = "userID";
         private const string WS_MESSAGE_KEY_USERNAME = "username";
+        private const string WS_MESSAGE_KEY_VALUE = "value";
         private const string WS_MESSAGE_KEY_WEBSOCKET_ACCESS_TOKEN = "access_token";
         private const string WS_MESSAGE_KEY_WEBSOCKET_ADDRESS = "address";
         private const string WS_MESSAGE_KEY_X = "x";
@@ -3245,10 +3346,13 @@ namespace Microsoft.Mixer
         private const string WS_MESSAGE_ERROR = "error";
 
         // Input
-        private const string CONTROL_TYPE_BUTTON = "button";
-        private const string CONTROL_TYPE_JOYSTICK = "joystick";
+        internal const string CONTROL_TYPE_BUTTON = "button";
+        internal const string CONTROL_TYPE_JOYSTICK = "joystick";
+
+        // Event names
         private const string EVENT_NAME_MOUSE_DOWN = "mousedown";
         private const string EVENT_NAME_MOUSE_UP = "mouseup";
+        private const string EVENT_NAME_MOVE = "move";
 
         // Message parameters
         private const string BOOLEAN_TRUE_VALUE = "true";
@@ -3268,6 +3372,11 @@ namespace Microsoft.Mixer
         internal static Dictionary<uint, Dictionary<string, InternalJoystickState>> _joystickStatesByParticipant;
         internal static Dictionary<string, InternalParticipantTrackingState> _participantsWhoTriggeredGiveInput;
         private static Dictionary<string, Dictionary<string, InternalControlPropertyUpdateData>> _queuedControlPropertyUpdates;
+
+        // Generic data structures for storing any control data
+        internal static Dictionary<string, Dictionary<uint, Dictionary<string, object>>> _giveInputControlDataByParticipant;
+        internal static Dictionary<string, Dictionary<string, object>> _giveInputControlData;
+        internal static Dictionary<string, object> _giveInputKeyValues;
 
         // For MockData
         public static bool useMockData = false;
@@ -3610,6 +3719,22 @@ namespace Microsoft.Mixer
                     {
                         _queuedControlPropertyUpdates[sceneID][controlID].properties[name] = value;
                     }
+                }
+            }
+        }
+
+        internal void RegisterControlForValueUpdates(string controlTypeName, List<string> valuesToTrack)
+        {
+            if (!_giveInputControlData.ContainsKey(controlTypeName))
+            {
+                Dictionary<string, object> controlValues = new Dictionary<string, object>();
+                _giveInputControlData[controlTypeName] = controlValues;
+            }
+            foreach (string key in valuesToTrack)
+            {
+                if (!_giveInputKeyValues.ContainsKey(key))
+                {
+                    _giveInputKeyValues.Add(key, null);
                 }
             }
         }

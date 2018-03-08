@@ -102,7 +102,7 @@ namespace Microsoft.Mixer
             return InteractivityManager.SingletonInstance.GetJoystickY(ControlID, userID);
         }
 
-        public InteractiveJoystickControl(string controlID, bool enabled, string helpText, string eTag, string sceneID) : base(controlID, enabled, helpText, eTag, sceneID)
+        public InteractiveJoystickControl(string controlID, InteractiveEventType type, bool enabled, string helpText, string eTag, string sceneID) : base(controlID, InteractivityManager.CONTROL_TYPE_JOYSTICK, type, enabled, helpText, eTag, sceneID)
         {
         }
 
