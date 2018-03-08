@@ -300,8 +300,10 @@ namespace Microsoft.Mixer
 #endif
         }
 
-        private string parseWebsocketConnectionUrl(string potentialWebsocketUrlsJson)
+        private void getWebsocketHosts(string potentialWebsocketUrlsJson)
         {
+            _websocketHosts.Clear();
+            _activeWebsocketHostIndex = 0;
             string targetWebsocketUrl = string.Empty;
             using (StringReader stringReader = new StringReader(potentialWebsocketUrlsJson))
             using (JsonTextReader jsonReader = new JsonTextReader(stringReader))
@@ -313,11 +315,11 @@ namespace Microsoft.Mixer
                     {
                         jsonReader.Read();
                         targetWebsocketUrl = jsonReader.Value.ToString();
-                        break;
+                        _websocketHosts.Add(targetWebsocketUrl);
                     }
                 }
             }
-            return targetWebsocketUrl;
+            _interactiveWebSocketUrl = _websocketHosts[_activeWebsocketHostIndex];
         }
 
         internal void SetWebsocketInstance(Websocket newWebsocket)
@@ -345,7 +347,7 @@ namespace Microsoft.Mixer
 
         private void CompleteInitiateConnection(string websocketHostsResponseString)
         {
-            _interactiveWebSocketUrl = parseWebsocketConnectionUrl(websocketHostsResponseString);
+            getWebsocketHosts(websocketHostsResponseString);
             if (string.IsNullOrEmpty(ProjectVersionID) ||
                 (string.IsNullOrEmpty(AppID) && string.IsNullOrEmpty(ShareCode)))
             {
@@ -512,6 +514,7 @@ namespace Microsoft.Mixer
             {
                 case 200: // OK
                     string oauthExchangeCode = ParseOAuthExchangeCodeFromStringResponse(getShortCodeStatusServerResponse);
+                    mixerInteractiveHelper.OnInternalCheckAuthStatusTimerCallback -= OnInternalCheckAuthStatusTimerCallback;
                     mixerInteractiveHelper.StopTimer(MixerInteractiveHelper.InteractiveTimerType.CheckAuthStatus);
                     GetOauthToken(oauthExchangeCode);
                     break;
@@ -705,12 +708,14 @@ namespace Microsoft.Mixer
                     }
                 }
             }
+            mixerInteractiveHelper.OnInternalRefreshShortCodeTimerCallback -= OnInternalRefreshShortCodeTimerCallback;
             mixerInteractiveHelper.OnInternalRefreshShortCodeTimerCallback += OnInternalRefreshShortCodeTimerCallback;
             mixerInteractiveHelper.StartTimer(
                 MixerInteractiveHelper.InteractiveTimerType.RefreshShortCode,
                 shortCodeExpirationTime
                 );
 
+            mixerInteractiveHelper.OnInternalCheckAuthStatusTimerCallback -= OnInternalCheckAuthStatusTimerCallback;
             mixerInteractiveHelper.OnInternalCheckAuthStatusTimerCallback += OnInternalCheckAuthStatusTimerCallback;
             mixerInteractiveHelper.StartTimer(
                 MixerInteractiveHelper.InteractiveTimerType.CheckAuthStatus,
@@ -938,6 +943,9 @@ namespace Microsoft.Mixer
                 // We do a retry with a reduced interval.
                 _pendingConnectToWebSocket = false;
                 _websocketConnected = false;
+                _activeWebsocketHostIndex++;
+                _interactiveWebSocketUrl = _websocketHosts[_activeWebsocketHostIndex];
+                mixerInteractiveHelper.OnInternalReconnectTimerCallback -= OnInternalReconnectTimerCallback;
                 mixerInteractiveHelper.OnInternalReconnectTimerCallback += OnInternalReconnectTimerCallback;
                 mixerInteractiveHelper.StartTimer(
                     MixerInteractiveHelper.InteractiveTimerType.Reconnect,
@@ -3234,6 +3242,8 @@ namespace Microsoft.Mixer
         private List<InteractiveControl> _controls;
         private List<InteractiveButtonControl> _buttons;
         private List<InteractiveJoystickControl> _joysticks;
+        private List<string> _websocketHosts;
+        private int _activeWebsocketHostIndex;
 
         MixerInteractiveHelper mixerInteractiveHelper;
 
@@ -3400,6 +3410,7 @@ namespace Microsoft.Mixer
             _joysticks = new List<InteractiveJoystickControl>();
             _participants = new List<InteractiveParticipant>();
             _scenes = new List<InteractiveScene>();
+            _websocketHosts = new List<string>();
 
             _buttonStates = new Dictionary<string, InternalButtonCountState>();
             _buttonStatesByParticipant = new Dictionary<uint, Dictionary<string, InternalButtonState>>();
@@ -3419,6 +3430,10 @@ namespace Microsoft.Mixer
             _participantsWhoTriggeredGiveInput = new Dictionary<string, InternalParticipantTrackingState>();
             _queuedControlPropertyUpdates = new Dictionary<string, Dictionary<string, InternalControlPropertyUpdateData>>();
 
+            _giveInputControlDataByParticipant = new Dictionary<string, Dictionary<uint, Dictionary<string, object>>>();
+            _giveInputControlData = new Dictionary<string, Dictionary<string, object>>();
+            _giveInputKeyValues = new Dictionary<string, object>();
+
             _streamingAssetsPath = Application.streamingAssetsPath;
 
             CreateStorageDirectoryIfNotExists();
@@ -3433,11 +3448,13 @@ namespace Microsoft.Mixer
 
         private void OnInternalRefreshShortCodeTimerCallback(object sender, MixerInteractiveHelper.InternalTimerCallbackEventArgs e)
         {
+            mixerInteractiveHelper.OnInternalRefreshShortCodeTimerCallback -= OnInternalRefreshShortCodeTimerCallback;
             RefreshShortCode();
         }
 
         private void OnInternalReconnectTimerCallback(object sender, MixerInteractiveHelper.InternalTimerCallbackEventArgs e)
         {
+            mixerInteractiveHelper.OnInternalReconnectTimerCallback -= OnInternalReconnectTimerCallback;
             VerifyAuthToken();
         }
 

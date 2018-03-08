@@ -466,9 +466,9 @@ internal class MixerInteractiveHelper: MonoBehaviour
         if (backgroundWorker != null)
         {
             backgroundWorker.DoWork -= OnInternalReconnectBackgroundWorkerDoWork;
-            if (OnInternalRefreshShortCodeTimerCallback != null)
+            if (OnInternalReconnectTimerCallback != null)
             {
-                OnInternalRefreshShortCodeTimerCallback(this, new InternalTimerCallbackEventArgs());
+                OnInternalReconnectTimerCallback(this, new InternalTimerCallbackEventArgs());
             }
         }
     }
