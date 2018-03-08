@@ -2198,13 +2198,18 @@ namespace Microsoft.Mixer
                                 break;
                             case WS_MESSAGE_KEY_EVENT:
                                 string eventValue = jsonReader.ReadAsString();
-                                if (eventValue == EVENT_NAME_MOUSE_DOWN || eventValue == EVENT_NAME_MOUSE_UP)
+                                if (eventValue == EVENT_NAME_MOUSE_DOWN || 
+                                    eventValue == EVENT_NAME_MOUSE_UP ||
+                                    eventValue == EVENT_NAME_KEY_DOWN ||
+                                    eventValue == EVENT_NAME_KEY_UP)
                                 {
-                                    if (eventValue == EVENT_NAME_MOUSE_DOWN)
+                                    if (eventValue == EVENT_NAME_MOUSE_DOWN ||
+                                    eventValue == EVENT_NAME_KEY_DOWN)
                                     {
                                         isPressed = true;
                                     }
-                                    else
+                                    else if (eventValue == EVENT_NAME_MOUSE_UP ||
+                                    eventValue == EVENT_NAME_KEY_UP)
                                     {
                                         isPressed = false;
                                     }
@@ -3362,6 +3367,8 @@ namespace Microsoft.Mixer
         // Event names
         private const string EVENT_NAME_MOUSE_DOWN = "mousedown";
         private const string EVENT_NAME_MOUSE_UP = "mouseup";
+        private const string EVENT_NAME_KEY_DOWN = "keydown";
+        private const string EVENT_NAME_KEY_UP = "keyup";
         private const string EVENT_NAME_MOVE = "move";
 
         // Message parameters
