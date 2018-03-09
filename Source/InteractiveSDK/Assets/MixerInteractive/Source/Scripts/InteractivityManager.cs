@@ -3762,6 +3762,42 @@ namespace Microsoft.Mixer
                 }
             }
         }
+
+        internal string InteractiveControlPropertyToString(InteractiveControlProperty property)
+        {
+            string controlPropertyString = string.Empty;
+            switch (property)
+            {
+                case InteractiveControlProperty.Text:
+                    controlPropertyString = "text";
+                    break;
+                case InteractiveControlProperty.BackgroundColor:
+                    controlPropertyString = "backgroundColor";
+                    break;
+                case InteractiveControlProperty.BackgroundImage:
+                    controlPropertyString = "backgroundImage";
+                    break;
+                case InteractiveControlProperty.TextColor:
+                    controlPropertyString = "textColor";
+                    break;
+                case InteractiveControlProperty.TextSize:
+                    controlPropertyString = "textSize";
+                    break;
+                case InteractiveControlProperty.BorderColor:
+                    controlPropertyString = "borderColor";
+                    break;
+                case InteractiveControlProperty.FocusColor:
+                    controlPropertyString = "focusColor";
+                    break;
+                case InteractiveControlProperty.AccentColor:
+                    controlPropertyString = "accentColor";
+                    break;
+                default:
+                    // No-op: Unexpected property.
+                    break;
+            }
+            return controlPropertyString;
+        }
     }
 
     internal struct InternalButtonCountState
