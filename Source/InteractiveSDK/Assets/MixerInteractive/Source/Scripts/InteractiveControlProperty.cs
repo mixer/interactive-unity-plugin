@@ -27,7 +27,7 @@ using System;
 namespace Microsoft.Mixer
 {
     /// <summary>
-    /// Defines values used to indicate the interactive event types.
+    /// The known values for control properties.
     /// </summary>
     public enum InteractiveControlProperty
     {

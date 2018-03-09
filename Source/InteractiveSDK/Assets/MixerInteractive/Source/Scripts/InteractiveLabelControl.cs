@@ -28,7 +28,7 @@ using System.Collections.Generic;
 namespace Microsoft.Mixer
 {
     /// <summary>
-    /// Represents an interactive button control. All controls are created and 
+    /// Represents an interactive label control. All controls are created and 
     /// configured using Interactive Studio.
     /// </summary>
 #if !WINDOWS_UWP
@@ -46,9 +46,9 @@ namespace Microsoft.Mixer
         }
 
         /// <summary>
-        /// Function to update the text for this button control.
+        /// Function to update the text for the label control.
         /// </summary>
-        /// <param name="text">String to display on the button.</param>
+        /// <param name="text">String to display on the label.</param>
         public void SetText(string text)
         {
             InteractivityManager interactivityManager = InteractivityManager.SingletonInstance;
