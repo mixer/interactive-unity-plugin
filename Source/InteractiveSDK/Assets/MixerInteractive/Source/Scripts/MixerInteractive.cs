@@ -74,6 +74,9 @@ public class MixerInteractive : MonoBehaviour
     public delegate void OnInteractiveJoystickControlEventHandler(object sender, InteractiveJoystickEventArgs e);
     public static event OnInteractiveJoystickControlEventHandler OnInteractiveJoystickControlEvent;
 
+    public delegate void OnInteractiveTextControlEventHandler(object sender, InteractiveTextEventArgs e);
+    public static event OnInteractiveTextControlEventHandler OnInteractiveTextControlEvent;
+
     public delegate void OnInteractiveMessageEventHandler(object sender, InteractiveMessageEventArgs e);
     public static event OnInteractiveMessageEventHandler OnInteractiveMessageEvent;
 
@@ -134,6 +137,7 @@ public class MixerInteractive : MonoBehaviour
             interactivityManager.OnParticipantStateChanged -= HandleParticipantStateChanged;
             interactivityManager.OnInteractiveButtonEvent -= HandleInteractiveButtonEvent;
             interactivityManager.OnInteractiveJoystickControlEvent -= HandleInteractiveJoystickControlEvent;
+            interactivityManager.OnInteractiveTextControlEvent -= HandleInteractiveTextControlEvent;
             interactivityManager.OnInteractiveMessageEvent -= HandleInteractiveMessageEvent;
 
             interactivityManager.OnError += HandleError;
@@ -141,6 +145,7 @@ public class MixerInteractive : MonoBehaviour
             interactivityManager.OnParticipantStateChanged += HandleParticipantStateChanged;
             interactivityManager.OnInteractiveButtonEvent += HandleInteractiveButtonEvent;
             interactivityManager.OnInteractiveJoystickControlEvent += HandleInteractiveJoystickControlEvent;
+            interactivityManager.OnInteractiveTextControlEvent += HandleInteractiveTextControlEvent; 
             interactivityManager.OnInteractiveMessageEvent += HandleInteractiveMessageEvent;
         }
         else
@@ -187,6 +192,11 @@ public class MixerInteractive : MonoBehaviour
     }
 
     private static void HandleInteractiveButtonEvent(object sender, InteractiveButtonEventArgs e)
+    {
+        queuedEvents.Add(e);
+    }
+
+    private void HandleInteractiveTextControlEvent(object sender, InteractiveTextEventArgs e)
     {
         queuedEvents.Add(e);
     }
@@ -491,6 +501,13 @@ public class MixerInteractive : MonoBehaviour
                         }
                         processedEvents.Add(interactiveEvent);
                         break;
+                    case InteractiveEventType.TextInput:
+                        if (OnInteractiveTextControlEvent != null)
+                        {
+                            OnInteractiveTextControlEvent(this, interactiveEvent as InteractiveTextEventArgs);
+                        }
+                        processedEvents.Add(interactiveEvent);
+                        break;
                     case InteractiveEventType.Error:
                         if (OnError != null)
                         {
@@ -727,6 +744,29 @@ public class MixerInteractive : MonoBehaviour
     public static InteractiveControl GetControl(string controlID)
     {
         return InteractivityManager.SingletonInstance.GetControl(controlID);
+    }
+
+    /// <summary>
+    /// Returns a list of participants and the text they entered.
+    /// </summary>
+    /// <param name="controlID">String ID of the control.</param>
+    public static IList<InteractiveTextResult> GetText(string controlID)
+    {
+        List<InteractiveTextResult> interactiveTextResults = new List<InteractiveTextResult>();
+        InteractivityManager interactivityManager = InteractivityManager.SingletonInstance;
+        Dictionary<uint, Dictionary<string, string>> textboxValuesByParticipant = InteractivityManager._textboxValuesByParticipant;
+        var participantUserIds = textboxValuesByParticipant.Keys;
+        foreach (uint participantUserId in participantUserIds)
+        {
+            Dictionary<string, string> textboxValues = textboxValuesByParticipant[participantUserId];
+            string text = string.Empty;
+            textboxValues.TryGetValue(controlID, out text);
+            var newTextResult = new InteractiveTextResult();
+            newTextResult.Participant = interactivityManager.ParticipantByUserId(participantUserId);
+            newTextResult.Text = text;
+            interactiveTextResults.Add(newTextResult);
+        }
+        return interactiveTextResults;
     }
 
     /// <summary>

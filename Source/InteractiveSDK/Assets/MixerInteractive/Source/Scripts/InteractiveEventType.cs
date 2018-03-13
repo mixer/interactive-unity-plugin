@@ -59,6 +59,11 @@ namespace Microsoft.Mixer
         /// <summary>
         /// Events representing joystick input.
         /// </summary>
-        Joystick
+        Joystick,
+
+        /// <summary>
+        /// Events representing text input.
+        /// </summary>
+        TextInput
     }
 }
