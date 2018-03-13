@@ -1444,6 +1444,7 @@ namespace Microsoft.Mixer
                                     HandleInteractivityStarted(jsonReader);
                                     break;
                                 case WS_MESSAGE_METHOD_ON_CONTROL_UPDATE:
+                                case WS_MESSAGE_METHOD_ON_CONTROL_CREATE:
                                     HandleControlUpdate(jsonReader);
                                     break;
                                 case WS_MESSAGE_METHOD_ON_GROUP_CREATE:
@@ -2390,6 +2391,7 @@ namespace Microsoft.Mixer
             string participantSessionID = string.Empty;
             string transactionID = string.Empty;
             InputEvent inputEvent = new InputEvent();
+
             while (jsonReader.Read())
             {
                 if (jsonReader.Value != null)
@@ -2414,6 +2416,7 @@ namespace Microsoft.Mixer
                     }
                 }
             }
+
             inputEvent.TransactionID = transactionID;
             InteractiveParticipant participant = ParticipantBySessionId(participantSessionID);
             if (!_participantsWhoTriggeredGiveInput.ContainsKey(inputEvent.ControlID))
@@ -3340,6 +3343,7 @@ namespace Microsoft.Mixer
         private const string WS_MESSAGE_METHOD_PARTICIPANT_UPDATE = "onParticipantUpdate";
         private const string WS_MESSAGE_METHOD_READY = "ready";
         private const string WS_MESSAGE_METHOD_ON_CONTROL_UPDATE = "onControlUpdate";
+        private const string WS_MESSAGE_METHOD_ON_CONTROL_CREATE = "onControlCreate";
         private const string WS_MESSAGE_METHOD_ON_GROUP_CREATE = "onGroupCreate";
         private const string WS_MESSAGE_METHOD_ON_GROUP_UPDATE = "onGroupUpdate";
         private const string WS_MESSAGE_METHOD_ON_READY = "onReady";
