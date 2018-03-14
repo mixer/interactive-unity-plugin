@@ -332,6 +332,30 @@ public class MixerInteractive : MonoBehaviour
     }
 
     /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="controlID">The ID of the control to check for submissions.</param>
+    /// <returns></returns>
+    public static bool HasSubmissions(string controlID)
+    {
+        bool hasSubmissions = false;
+        // Get the control, check if the submit state is true.
+        InteractiveTextControl textControl = GetControl(controlID) as InteractiveTextControl;
+        if (textControl != null &&
+            GetText(controlID) != null)
+        {
+            hasSubmissions = true;
+        }
+
+        if (hasSubmissions)
+        {
+            CaptureTransactionForControlID(controlID);
+        }
+
+        return hasSubmissions;
+    }
+
+    /// <summary>
     /// Kicks off a background task to set up the connection to the interactivity service.
     /// </summary>
     /// <returns>true if initialization request was accepted, false if not</returns>
@@ -552,7 +576,7 @@ public class MixerInteractive : MonoBehaviour
         if (buttonDown &&
             !ManuallyHandleSparkTransactions)
         {
-            CaptureTransactionForButtonID(controlID);
+            CaptureTransactionForControlID(controlID);
         }
         return buttonDown;
     }
@@ -567,7 +591,7 @@ public class MixerInteractive : MonoBehaviour
         if (buttonPressed &&
             !ManuallyHandleSparkTransactions)
         {
-            CaptureTransactionForButtonID(controlID);
+            CaptureTransactionForControlID(controlID);
         }
         return buttonPressed;
     }
@@ -582,7 +606,7 @@ public class MixerInteractive : MonoBehaviour
         if (buttonUp &&
             !ManuallyHandleSparkTransactions)
         {
-            CaptureTransactionForButtonID(controlID);
+            CaptureTransactionForControlID(controlID);
         }
         return buttonUp;
     }
@@ -750,23 +774,10 @@ public class MixerInteractive : MonoBehaviour
     /// Returns a list of participants and the text they entered.
     /// </summary>
     /// <param name="controlID">String ID of the control.</param>
+    /// <returns>Returns a list of InteractiveTextResult objects. Returns an empty list if there was no input.</returns>
     public static IList<InteractiveTextResult> GetText(string controlID)
     {
-        List<InteractiveTextResult> interactiveTextResults = new List<InteractiveTextResult>();
-        InteractivityManager interactivityManager = InteractivityManager.SingletonInstance;
-        Dictionary<uint, Dictionary<string, string>> textboxValuesByParticipant = InteractivityManager._textboxValuesByParticipant;
-        var participantUserIds = textboxValuesByParticipant.Keys;
-        foreach (uint participantUserId in participantUserIds)
-        {
-            Dictionary<string, string> textboxValues = textboxValuesByParticipant[participantUserId];
-            string text = string.Empty;
-            textboxValues.TryGetValue(controlID, out text);
-            var newTextResult = new InteractiveTextResult();
-            newTextResult.Participant = interactivityManager.ParticipantByUserId(participantUserId);
-            newTextResult.Text = text;
-            interactiveTextResults.Add(newTextResult);
-        }
-        return interactiveTextResults;
+        return InteractivityManager.SingletonInstance.GetText(controlID);
     }
 
     /// <summary>
@@ -1025,7 +1036,7 @@ public class MixerInteractive : MonoBehaviour
     }
 #endif
 
-    private static void CaptureTransactionForButtonID(string controlID)
+    private static void CaptureTransactionForControlID(string controlID)
     {
         var buttons = Buttons;
         var buttonStateKeys = InteractivityManager._buttonStates.Keys;

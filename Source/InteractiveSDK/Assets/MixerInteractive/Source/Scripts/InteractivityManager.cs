@@ -1319,7 +1319,7 @@ namespace Microsoft.Mixer
                     jsonWriter.WritePropertyName(WS_MESSAGE_KEY_CONTROLS);
                     jsonWriter.WriteStartArray();
 
-                    var controlIDs  = _queuedControlPropertyUpdates[sceneID].Keys;
+                    var controlIDs = _queuedControlPropertyUpdates[sceneID].Keys;
                     foreach (string controlID in controlIDs)
                     {
                         jsonWriter.WriteStartObject();
@@ -2383,11 +2383,11 @@ namespace Microsoft.Mixer
                 string controlID,
                 string kind,
                 string eventName,
-                InteractiveEventType type, 
-                bool isPressed, 
-                float x, 
-                float y, 
-                uint cost, 
+                InteractiveEventType type,
+                bool isPressed,
+                float x,
+                float y,
+                uint cost,
                 string transactionID,
                 string textValue,
                 object value
@@ -2439,6 +2439,14 @@ namespace Microsoft.Mixer
             }
 
             inputEvent.TransactionID = transactionID;
+            InternalTransactionIDState newTransactionIDState = new InternalTransactionIDState();
+            if (_transactionIDsState.ContainsKey(inputEvent.ControlID))
+            {
+                newTransactionIDState = _transactionIDsState[inputEvent.ControlID];
+            }
+            newTransactionIDState.nextTransactionID = transactionID;
+            _transactionIDsState[inputEvent.ControlID] = newTransactionIDState;
+
             InteractiveParticipant participant = ParticipantBySessionId(participantSessionID);
             if (!_participantsWhoTriggeredGiveInput.ContainsKey(inputEvent.ControlID))
             {
@@ -2459,7 +2467,7 @@ namespace Microsoft.Mixer
             }
             else if (inputEvent.Type == InteractiveEventType.TextInput)
             {
-                InteractiveTextEventArgs textEventArgs = new InteractiveTextEventArgs(inputEvent.Type, inputEvent.ControlID, participant, inputEvent.TextValue);
+                InteractiveTextEventArgs textEventArgs = new InteractiveTextEventArgs(inputEvent.Type, inputEvent.ControlID, participant, inputEvent.TextValue, transactionID);
                 _queuedEvents.Add(textEventArgs);
                 UpdateInternalTextBoxState(textEventArgs);
             }
@@ -2839,6 +2847,25 @@ namespace Microsoft.Mixer
             }
         }
 
+        internal IList<InteractiveTextResult> GetText(string controlID)
+        {
+            List<InteractiveTextResult> interactiveTextResults = new List<InteractiveTextResult>();
+            InteractivityManager interactivityManager = InteractivityManager.SingletonInstance;
+            Dictionary<uint, Dictionary<string, string>> textboxValuesByParticipant = InteractivityManager._textboxValuesByParticipant;
+            var participantUserIds = textboxValuesByParticipant.Keys;
+            foreach (uint participantUserId in participantUserIds)
+            {
+                Dictionary<string, string> textboxValues = textboxValuesByParticipant[participantUserId];
+                string text = string.Empty;
+                textboxValues.TryGetValue(controlID, out text);
+                var newTextResult = new InteractiveTextResult();
+                newTextResult.Participant = interactivityManager.ParticipantByUserId(participantUserId);
+                newTextResult.Text = text;
+                interactiveTextResults.Add(newTextResult);
+            }
+            return interactiveTextResults;
+        }
+
         internal void SetCurrentSceneInternal(InteractiveGroup group, string sceneID)
         {
             SendSetUpdateGroupsMessage(group.GroupID, sceneID, group.etag);
@@ -3142,11 +3169,11 @@ namespace Microsoft.Mixer
         }
 
         internal void SendSetButtonControlProperties(
-            string controlID, 
-            string propertyName, 
-            bool disabled, 
-            float progress, 
-            string text, 
+            string controlID,
+            string propertyName,
+            bool disabled,
+            float progress,
+            string text,
             uint cost
             )
         {
@@ -3443,19 +3470,20 @@ namespace Microsoft.Mixer
         // Misc
         private const string PROTOCOL_VERSION = "2.0";
 
-        // New data  structures
+        // Control-specific data structures
         internal static Dictionary<string, InternalButtonCountState> _buttonStates;
         internal static Dictionary<uint, Dictionary<string, InternalButtonState>> _buttonStatesByParticipant;
         internal static Dictionary<string, InternalJoystickState> _joystickStates;
         internal static Dictionary<uint, Dictionary<string, InternalJoystickState>> _joystickStatesByParticipant;
         internal static Dictionary<uint, Dictionary<string, string>> _textboxValuesByParticipant;
-        internal static Dictionary<string, InternalParticipantTrackingState> _participantsWhoTriggeredGiveInput;
-        private static Dictionary<string, Dictionary<string, InternalControlPropertyUpdateData>> _queuedControlPropertyUpdates;
 
         // Generic data structures for storing any control data
         internal static Dictionary<string, Dictionary<uint, Dictionary<string, object>>> _giveInputControlDataByParticipant;
         internal static Dictionary<string, Dictionary<string, object>> _giveInputControlData;
         internal static Dictionary<string, object> _giveInputKeyValues;
+        internal static Dictionary<string, InternalParticipantTrackingState> _participantsWhoTriggeredGiveInput;
+        private static Dictionary<string, Dictionary<string, InternalControlPropertyUpdateData>> _queuedControlPropertyUpdates;
+        internal static Dictionary<string, InternalTransactionIDState> _transactionIDsState;
 
         // For MockData
         public static bool useMockData = false;
@@ -3617,6 +3645,20 @@ namespace Microsoft.Mixer
                 newParticipantTrackingState.nextParticpant = null;
 
                 _participantsWhoTriggeredGiveInput[controlIDKey] = newParticipantTrackingState;
+            }
+
+            // Clear transaction IDs
+            var transactionIDsStateKeys = _transactionIDsState.Keys;
+            foreach (string transactionIDsStateKey in transactionIDsStateKeys)
+            {
+                InternalTransactionIDState oldTransactionIDState = _transactionIDsState[transactionIDsStateKey];
+                InternalTransactionIDState newTransactionIDState = new InternalTransactionIDState();
+
+                newTransactionIDState.previousTransactionID = oldTransactionIDState.transactionID;
+                newTransactionIDState.transactionID = oldTransactionIDState.nextTransactionID;
+                newTransactionIDState.nextTransactionID = string.Empty;
+
+                _transactionIDsState[transactionIDsStateKey] = newTransactionIDState;
             }
         }
 
@@ -3916,6 +3958,16 @@ namespace Microsoft.Mixer
         internal InternalButtonCountState ButtonCountState;
     }
 
+    internal struct InternalControlPropertyUpdateData
+    {
+        internal Dictionary<string, object> properties;
+        public InternalControlPropertyUpdateData(string name, object value)
+        {
+            properties = new Dictionary<string, object>();
+            properties.Add(name, value);
+        }
+    }
+
     internal struct InternalJoystickState
     {
         internal double X;
@@ -3936,13 +3988,16 @@ namespace Microsoft.Mixer
         }
     }
 
-    internal struct InternalControlPropertyUpdateData
+    internal struct InternalTransactionIDState
     {
-        internal Dictionary<string, object> properties;
-        public InternalControlPropertyUpdateData(string name, object value)
+        internal string previousTransactionID;
+        internal string transactionID;
+        internal string nextTransactionID;
+        public InternalTransactionIDState(string newTransactionID)
         {
-            properties = new Dictionary<string, object>();
-            properties.Add(name, value);
+            nextTransactionID = newTransactionID;
+            transactionID = null;
+            previousTransactionID = null;
         }
     }
 }

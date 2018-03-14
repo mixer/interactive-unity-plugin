@@ -15,15 +15,12 @@ namespace Microsoft.Mixer
         /// <summary>
         /// Text from the text entry control.
         /// </summary>
-        public List<string> Text
+        public IList<InteractiveTextResult> TextResults
         {
-            get;
-            private set;
-        }
-
-        public InteractiveButtonControl SubmitButton
-        {
-            
+            get
+            {
+                return InteractivityManager.SingletonInstance.GetText(ControlID);
+            }
         }
 
         public InteractiveTextControl(string controlID, InteractiveEventType type, bool disabled, string helpText, string eTag, string sceneID) : base(controlID, InteractivityManager.CONTROL_KIND_TEXTBOX, type, disabled, helpText, eTag, sceneID)
