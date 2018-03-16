@@ -342,7 +342,7 @@ public class MixerInteractive : MonoBehaviour
         // Get the control, check if the submit state is true.
         InteractiveTextControl textControl = GetControl(controlID) as InteractiveTextControl;
         if (textControl != null &&
-            GetText(controlID) != null)
+            GetText(controlID).Count > 0)
         {
             hasSubmissions = true;
         }
@@ -576,7 +576,7 @@ public class MixerInteractive : MonoBehaviour
         if (buttonDown &&
             !ManuallyHandleSparkTransactions)
         {
-            CaptureTransactionForControlID(controlID);
+            CaptureTransactionForButtonControlID(controlID);
         }
         return buttonDown;
     }
@@ -591,7 +591,7 @@ public class MixerInteractive : MonoBehaviour
         if (buttonPressed &&
             !ManuallyHandleSparkTransactions)
         {
-            CaptureTransactionForControlID(controlID);
+            CaptureTransactionForButtonControlID(controlID);
         }
         return buttonPressed;
     }
@@ -606,7 +606,7 @@ public class MixerInteractive : MonoBehaviour
         if (buttonUp &&
             !ManuallyHandleSparkTransactions)
         {
-            CaptureTransactionForControlID(controlID);
+            CaptureTransactionForButtonControlID(controlID);
         }
         return buttonUp;
     }
@@ -1036,7 +1036,7 @@ public class MixerInteractive : MonoBehaviour
     }
 #endif
 
-    private static void CaptureTransactionForControlID(string controlID)
+    private static void CaptureTransactionForButtonControlID(string controlID)
     {
         var buttons = Buttons;
         var buttonStateKeys = InteractivityManager._buttonStates.Keys;
@@ -1046,6 +1046,21 @@ public class MixerInteractive : MonoBehaviour
             {
                 InteractivityManager.SingletonInstance.CaptureTransaction(
                     InteractivityManager._buttonStates[buttonStateKey].TransactionID
+                    );
+                break;
+            }
+        }
+    }
+
+    private static void CaptureTransactionForControlID(string controlID)
+    {
+        var transactionIDsStateKeys = InteractivityManager._transactionIDsState.Keys;
+        foreach (string transactionControlID in transactionIDsStateKeys)
+        {
+            if (transactionControlID == controlID)
+            {
+                InteractivityManager.SingletonInstance.CaptureTransaction(
+                    InteractivityManager._transactionIDsState[transactionControlID].transactionID
                     );
                 break;
             }

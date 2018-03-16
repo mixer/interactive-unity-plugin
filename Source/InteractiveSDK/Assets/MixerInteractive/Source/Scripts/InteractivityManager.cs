@@ -279,7 +279,7 @@ namespace Microsoft.Mixer
             // On Xbox Live platforms, we try to get an Xbox Live token
 #if !UNITY_EDITOR && UNITY_XBOXONE
             
-            var tokenData = new string(' ', 10240); // TODO: Can probably allocate less memory
+            var tokenData = new string(' ', 10240);
             GCHandle pinnedMemory = GCHandle.Alloc(tokenData, GCHandleType.Pinned);
             System.IntPtr dataPointer = pinnedMemory.AddrOfPinnedObject();
             bool getXTokenSucceeded = MixerEraNativePlugin_GetXToken(dataPointer);
@@ -2467,7 +2467,7 @@ namespace Microsoft.Mixer
             }
             else if (inputEvent.Type == InteractiveEventType.TextInput)
             {
-                InteractiveTextEventArgs textEventArgs = new InteractiveTextEventArgs(inputEvent.Type, inputEvent.ControlID, participant, inputEvent.TextValue, transactionID);
+                InteractiveTextEventArgs textEventArgs = new InteractiveTextEventArgs(inputEvent.Type, inputEvent.ControlID, participant, inputEvent.TextValue, inputEvent.TransactionID);
                 _queuedEvents.Add(textEventArgs);
                 UpdateInternalTextBoxState(textEventArgs);
             }
@@ -3526,6 +3526,7 @@ namespace Microsoft.Mixer
 
             _participantsWhoTriggeredGiveInput = new Dictionary<string, InternalParticipantTrackingState>();
             _queuedControlPropertyUpdates = new Dictionary<string, Dictionary<string, InternalControlPropertyUpdateData>>();
+            _transactionIDsState = new Dictionary<string, InternalTransactionIDState>();
 
             _giveInputControlDataByParticipant = new Dictionary<string, Dictionary<uint, Dictionary<string, object>>>();
             _giveInputControlData = new Dictionary<string, Dictionary<string, object>>();
@@ -3648,7 +3649,7 @@ namespace Microsoft.Mixer
             }
 
             // Clear transaction IDs
-            var transactionIDsStateKeys = _transactionIDsState.Keys;
+            var transactionIDsStateKeys = new List<string>(_transactionIDsState.Keys);
             foreach (string transactionIDsStateKey in transactionIDsStateKeys)
             {
                 InternalTransactionIDState oldTransactionIDState = _transactionIDsState[transactionIDsStateKey];
