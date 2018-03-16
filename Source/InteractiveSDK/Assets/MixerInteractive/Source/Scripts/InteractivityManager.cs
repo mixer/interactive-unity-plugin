@@ -77,6 +77,9 @@ namespace Microsoft.Mixer
         public delegate void OnInteractiveJoystickControlEventHandler(object sender, InteractiveJoystickEventArgs e);
         public event OnInteractiveJoystickControlEventHandler OnInteractiveJoystickControlEvent;
 
+        internal delegate void OnInteractiveTextControlEventHandler(object sender, InteractiveTextEventArgs e);
+        internal event OnInteractiveTextControlEventHandler OnInteractiveTextControlEvent;
+
         public delegate void OnInteractiveMessageEventHandler(object sender, InteractiveMessageEventArgs e);
         public event OnInteractiveMessageEventHandler OnInteractiveMessageEvent;
 
@@ -276,7 +279,7 @@ namespace Microsoft.Mixer
             // On Xbox Live platforms, we try to get an Xbox Live token
 #if !UNITY_EDITOR && UNITY_XBOXONE
             
-            var tokenData = new string(' ', 10240); // TODO: Can probably allocate less memory
+            var tokenData = new string(' ', 10240);
             GCHandle pinnedMemory = GCHandle.Alloc(tokenData, GCHandleType.Pinned);
             System.IntPtr dataPointer = pinnedMemory.AddrOfPinnedObject();
             bool getXTokenSucceeded = MixerEraNativePlugin_GetXToken(dataPointer);
@@ -1268,6 +1271,12 @@ namespace Microsoft.Mixer
                             OnInteractiveJoystickControlEvent(this, interactiveEvent as InteractiveJoystickEventArgs);
                         }
                         break;
+                    case InteractiveEventType.TextInput:
+                        if (OnInteractiveTextControlEvent != null)
+                        {
+                            OnInteractiveTextControlEvent(this, interactiveEvent as InteractiveTextEventArgs);
+                        }
+                        break;
                     case InteractiveEventType.Error:
                         if (OnError != null)
                         {
@@ -1310,7 +1319,7 @@ namespace Microsoft.Mixer
                     jsonWriter.WritePropertyName(WS_MESSAGE_KEY_CONTROLS);
                     jsonWriter.WriteStartArray();
 
-                    var controlIDs  = _queuedControlPropertyUpdates[sceneID].Keys;
+                    var controlIDs = _queuedControlPropertyUpdates[sceneID].Keys;
                     foreach (string controlID in controlIDs)
                     {
                         jsonWriter.WriteStartObject();
@@ -2151,6 +2160,10 @@ namespace Microsoft.Mixer
             {
                 newControl = new InteractiveJoystickControl(controlID, InteractiveEventType.Joystick, disabled, helpText, eTag, sceneID);
             }
+            else if (kind == WS_MESSAGE_VALUE_CONTROL_TYPE_TEXTBOX)
+            {
+                newControl = new InteractiveTextControl(controlID, InteractiveEventType.TextInput, disabled, helpText, eTag, sceneID);
+            }
             else
             {
                 newControl = new InteractiveControl(controlID, kind, InteractiveEventType.Unknown, disabled, helpText, eTag, sceneID);
@@ -2181,6 +2194,7 @@ namespace Microsoft.Mixer
             bool isPressed = false;
             float x = 0;
             float y = 0;
+            string textValue = string.Empty;
             try
             {
                 while (jsonReader.Read() && jsonReader.Depth > startDepth)
@@ -2199,7 +2213,7 @@ namespace Microsoft.Mixer
                                 break;
                             case WS_MESSAGE_KEY_EVENT:
                                 string eventValue = jsonReader.ReadAsString();
-                                if (eventValue == EVENT_NAME_MOUSE_DOWN || 
+                                if (eventValue == EVENT_NAME_MOUSE_DOWN ||
                                     eventValue == EVENT_NAME_MOUSE_UP ||
                                     eventValue == EVENT_NAME_KEY_DOWN ||
                                     eventValue == EVENT_NAME_KEY_UP)
@@ -2258,7 +2272,11 @@ namespace Microsoft.Mixer
                 cost = button.Cost;
             }
             InteractiveEventType controlType = InteractiveEventTypeFromID(controlID);
-            return new InputEvent(controlID, control.Kind, eventName, controlType, isPressed, x, y, cost, string.Empty, rawValue);
+            if (controlType == InteractiveEventType.TextInput)
+            {
+                textValue = rawValue.ToString();
+            }
+            return new InputEvent(controlID, control.Kind, eventName, controlType, isPressed, x, y, cost, string.Empty, textValue, rawValue);
         }
 
         private void HandleParticipantJoin(JsonReader jsonReader)
@@ -2358,18 +2376,20 @@ namespace Microsoft.Mixer
             internal string TransactionID;
             internal float X;
             internal float Y;
+            internal string TextValue;
             object Value;
 
             internal InputEvent(
                 string controlID,
                 string kind,
                 string eventName,
-                InteractiveEventType type, 
-                bool isPressed, 
-                float x, 
-                float y, 
-                uint cost, 
+                InteractiveEventType type,
+                bool isPressed,
+                float x,
+                float y,
+                uint cost,
                 string transactionID,
+                string textValue,
                 object value
                 )
             {
@@ -2382,6 +2402,7 @@ namespace Microsoft.Mixer
                 IsPressed = isPressed;
                 X = x;
                 Y = y;
+                TextValue = textValue;
                 Value = value;
             }
         };
@@ -2418,6 +2439,14 @@ namespace Microsoft.Mixer
             }
 
             inputEvent.TransactionID = transactionID;
+            InternalTransactionIDState newTransactionIDState = new InternalTransactionIDState();
+            if (_transactionIDsState.ContainsKey(inputEvent.ControlID))
+            {
+                newTransactionIDState = _transactionIDsState[inputEvent.ControlID];
+            }
+            newTransactionIDState.nextTransactionID = transactionID;
+            _transactionIDsState[inputEvent.ControlID] = newTransactionIDState;
+
             InteractiveParticipant participant = ParticipantBySessionId(participantSessionID);
             if (!_participantsWhoTriggeredGiveInput.ContainsKey(inputEvent.ControlID))
             {
@@ -2435,6 +2464,12 @@ namespace Microsoft.Mixer
                 InteractiveJoystickEventArgs eventArgs = new InteractiveJoystickEventArgs(inputEvent.Type, inputEvent.ControlID, participant, inputEvent.X, inputEvent.Y);
                 _queuedEvents.Add(eventArgs);
                 UpdateInternalJoystickState(eventArgs);
+            }
+            else if (inputEvent.Type == InteractiveEventType.TextInput)
+            {
+                InteractiveTextEventArgs textEventArgs = new InteractiveTextEventArgs(inputEvent.Type, inputEvent.ControlID, participant, inputEvent.TextValue, inputEvent.TransactionID);
+                _queuedEvents.Add(textEventArgs);
+                UpdateInternalTextBoxState(textEventArgs);
             }
 
             uint participantID = participant.UserID;
@@ -2498,6 +2533,21 @@ namespace Microsoft.Mixer
             foreach (InteractiveParticipant participant in existingParticipants)
             {
                 if (participant.sessionID == sessionID)
+                {
+                    target = participant;
+                    break;
+                }
+            }
+            return target;
+        }
+
+        internal InteractiveParticipant ParticipantByUserId(uint userID)
+        {
+            InteractiveParticipant target = null;
+            var existingParticipants = Participants;
+            foreach (InteractiveParticipant participant in existingParticipants)
+            {
+                if (participant.UserID == userID)
                 {
                     target = participant;
                     break;
@@ -2707,6 +2757,18 @@ namespace Microsoft.Mixer
             return joystickExists;
         }
 
+        internal string GetText(string controlID, uint userID)
+        {
+            string text = string.Empty;
+            Dictionary<string, string> participantTextBoxes;
+            bool participantExists = _textboxValuesByParticipant.TryGetValue(userID, out participantTextBoxes);
+            if (participantExists)
+            {
+                participantTextBoxes.TryGetValue(controlID, out text);
+            }
+            return text;
+        }
+
         internal InteractiveControl GetControl(string controlID)
         {
             InteractiveControl control = new InteractiveControl(controlID, "", InteractiveEventType.Unknown, true, "", "", "");
@@ -2783,6 +2845,25 @@ namespace Microsoft.Mixer
             {
                 defaultGroup.SetScene(sceneID);
             }
+        }
+
+        internal IList<InteractiveTextResult> GetText(string controlID)
+        {
+            List<InteractiveTextResult> interactiveTextResults = new List<InteractiveTextResult>();
+            InteractivityManager interactivityManager = InteractivityManager.SingletonInstance;
+            Dictionary<uint, Dictionary<string, string>> textboxValuesByParticipant = InteractivityManager._textboxValuesByParticipant;
+            var participantUserIds = textboxValuesByParticipant.Keys;
+            foreach (uint participantUserId in participantUserIds)
+            {
+                Dictionary<string, string> textboxValues = textboxValuesByParticipant[participantUserId];
+                string text = string.Empty;
+                textboxValues.TryGetValue(controlID, out text);
+                var newTextResult = new InteractiveTextResult();
+                newTextResult.Participant = interactivityManager.ParticipantByUserId(participantUserId);
+                newTextResult.Text = text;
+                interactiveTextResults.Add(newTextResult);
+            }
+            return interactiveTextResults;
         }
 
         internal void SetCurrentSceneInternal(InteractiveGroup group, string sceneID)
@@ -3088,11 +3169,11 @@ namespace Microsoft.Mixer
         }
 
         internal void SendSetButtonControlProperties(
-            string controlID, 
-            string propertyName, 
-            bool disabled, 
-            float progress, 
-            string text, 
+            string controlID,
+            string propertyName,
+            bool disabled,
+            float progress,
+            string text,
             uint cost
             )
         {
@@ -3325,6 +3406,7 @@ namespace Microsoft.Mixer
         internal const string WS_MESSAGE_VALUE_DEFAULT_GROUP_ID = "default";
         internal const string WS_MESSAGE_VALUE_DEFAULT_SCENE_ID = "default";
         private const string WS_MESSAGE_VALUE_CONTROL_TYPE_JOYSTICK = "joystick";
+        internal const string WS_MESSAGE_VALUE_CONTROL_TYPE_TEXTBOX = "textbox";
         private const bool WS_MESSAGE_VALUE_TRUE = true;
 
         // Message types
@@ -3367,6 +3449,7 @@ namespace Microsoft.Mixer
         // Input
         internal const string CONTROL_TYPE_BUTTON = "button";
         internal const string CONTROL_TYPE_JOYSTICK = "joystick";
+        internal const string CONTROL_KIND_TEXTBOX = "textbox";
 
         // Event names
         private const string EVENT_NAME_MOUSE_DOWN = "mousedown";
@@ -3374,6 +3457,7 @@ namespace Microsoft.Mixer
         private const string EVENT_NAME_KEY_DOWN = "keydown";
         private const string EVENT_NAME_KEY_UP = "keyup";
         private const string EVENT_NAME_MOVE = "move";
+        private const string EVENT_NAME_SUBMIT = "submit";
 
         // Message parameters
         private const string BOOLEAN_TRUE_VALUE = "true";
@@ -3386,18 +3470,20 @@ namespace Microsoft.Mixer
         // Misc
         private const string PROTOCOL_VERSION = "2.0";
 
-        // New data  structures
+        // Control-specific data structures
         internal static Dictionary<string, InternalButtonCountState> _buttonStates;
         internal static Dictionary<uint, Dictionary<string, InternalButtonState>> _buttonStatesByParticipant;
         internal static Dictionary<string, InternalJoystickState> _joystickStates;
         internal static Dictionary<uint, Dictionary<string, InternalJoystickState>> _joystickStatesByParticipant;
-        internal static Dictionary<string, InternalParticipantTrackingState> _participantsWhoTriggeredGiveInput;
-        private static Dictionary<string, Dictionary<string, InternalControlPropertyUpdateData>> _queuedControlPropertyUpdates;
+        internal static Dictionary<uint, Dictionary<string, string>> _textboxValuesByParticipant;
 
         // Generic data structures for storing any control data
         internal static Dictionary<string, Dictionary<uint, Dictionary<string, object>>> _giveInputControlDataByParticipant;
         internal static Dictionary<string, Dictionary<string, object>> _giveInputControlData;
         internal static Dictionary<string, object> _giveInputKeyValues;
+        internal static Dictionary<string, InternalParticipantTrackingState> _participantsWhoTriggeredGiveInput;
+        private static Dictionary<string, Dictionary<string, InternalControlPropertyUpdateData>> _queuedControlPropertyUpdates;
+        internal static Dictionary<string, InternalTransactionIDState> _transactionIDsState;
 
         // For MockData
         public static bool useMockData = false;
@@ -3440,10 +3526,12 @@ namespace Microsoft.Mixer
 
             _participantsWhoTriggeredGiveInput = new Dictionary<string, InternalParticipantTrackingState>();
             _queuedControlPropertyUpdates = new Dictionary<string, Dictionary<string, InternalControlPropertyUpdateData>>();
+            _transactionIDsState = new Dictionary<string, InternalTransactionIDState>();
 
             _giveInputControlDataByParticipant = new Dictionary<string, Dictionary<uint, Dictionary<string, object>>>();
             _giveInputControlData = new Dictionary<string, Dictionary<string, object>>();
             _giveInputKeyValues = new Dictionary<string, object>();
+            _textboxValuesByParticipant = new Dictionary<uint, Dictionary<string, string>>();
 
             _streamingAssetsPath = Application.streamingAssetsPath;
 
@@ -3558,6 +3646,20 @@ namespace Microsoft.Mixer
                 newParticipantTrackingState.nextParticpant = null;
 
                 _participantsWhoTriggeredGiveInput[controlIDKey] = newParticipantTrackingState;
+            }
+
+            // Clear transaction IDs
+            var transactionIDsStateKeys = new List<string>(_transactionIDsState.Keys);
+            foreach (string transactionIDsStateKey in transactionIDsStateKeys)
+            {
+                InternalTransactionIDState oldTransactionIDState = _transactionIDsState[transactionIDsStateKey];
+                InternalTransactionIDState newTransactionIDState = new InternalTransactionIDState();
+
+                newTransactionIDState.previousTransactionID = oldTransactionIDState.transactionID;
+                newTransactionIDState.transactionID = oldTransactionIDState.nextTransactionID;
+                newTransactionIDState.nextTransactionID = string.Empty;
+
+                _transactionIDsState[transactionIDsStateKey] = newTransactionIDState;
             }
         }
 
@@ -3716,6 +3818,32 @@ namespace Microsoft.Mixer
             _joystickStates[e.ControlID] = newJoystickState;
         }
 
+        private void UpdateInternalTextBoxState(InteractiveTextEventArgs e)
+        {
+            // Make sure the entry exists
+            uint participantId = e.Participant.UserID;
+            string controlID = e.ControlID;
+            string text = e.Text;
+            Dictionary<string, string> newTextStateByParticipant;
+            string newTextState = string.Empty;
+            bool participantEntryExists = _textboxValuesByParticipant.TryGetValue(participantId, out newTextStateByParticipant);
+            if (!participantEntryExists)
+            {
+                newTextStateByParticipant = new Dictionary<string, string>();
+                newTextStateByParticipant.Add(controlID, text);
+                _textboxValuesByParticipant.Add(participantId, newTextStateByParticipant);
+            }
+            else
+            {
+                bool textStateByParticipantEntryExists = newTextStateByParticipant.TryGetValue(controlID, out newTextState);
+                if (!textStateByParticipantEntryExists)
+                {
+                    newTextStateByParticipant.Add(controlID, text);
+                }
+            }
+            _textboxValuesByParticipant[e.Participant.UserID][e.ControlID] = text;
+        }
+
         internal void QueuePropertyUpdate(string sceneID, string controlID, string name, object value)
         {
             // If a scene entry doesn't exist, add one.
@@ -3831,6 +3959,16 @@ namespace Microsoft.Mixer
         internal InternalButtonCountState ButtonCountState;
     }
 
+    internal struct InternalControlPropertyUpdateData
+    {
+        internal Dictionary<string, object> properties;
+        public InternalControlPropertyUpdateData(string name, object value)
+        {
+            properties = new Dictionary<string, object>();
+            properties.Add(name, value);
+        }
+    }
+
     internal struct InternalJoystickState
     {
         internal double X;
@@ -3851,13 +3989,16 @@ namespace Microsoft.Mixer
         }
     }
 
-    internal struct InternalControlPropertyUpdateData
+    internal struct InternalTransactionIDState
     {
-        internal Dictionary<string, object> properties;
-        public InternalControlPropertyUpdateData(string name, object value)
+        internal string previousTransactionID;
+        internal string transactionID;
+        internal string nextTransactionID;
+        public InternalTransactionIDState(string newTransactionID)
         {
-            properties = new Dictionary<string, object>();
-            properties.Add(name, value);
+            nextTransactionID = newTransactionID;
+            transactionID = null;
+            previousTransactionID = null;
         }
     }
 }

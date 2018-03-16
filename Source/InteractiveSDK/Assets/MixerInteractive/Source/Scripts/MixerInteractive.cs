@@ -74,6 +74,9 @@ public class MixerInteractive : MonoBehaviour
     public delegate void OnInteractiveJoystickControlEventHandler(object sender, InteractiveJoystickEventArgs e);
     public static event OnInteractiveJoystickControlEventHandler OnInteractiveJoystickControlEvent;
 
+    public delegate void OnInteractiveTextControlEventHandler(object sender, InteractiveTextEventArgs e);
+    public static event OnInteractiveTextControlEventHandler OnInteractiveTextControlEvent;
+
     public delegate void OnInteractiveMessageEventHandler(object sender, InteractiveMessageEventArgs e);
     public static event OnInteractiveMessageEventHandler OnInteractiveMessageEvent;
 
@@ -134,6 +137,7 @@ public class MixerInteractive : MonoBehaviour
             interactivityManager.OnParticipantStateChanged -= HandleParticipantStateChanged;
             interactivityManager.OnInteractiveButtonEvent -= HandleInteractiveButtonEvent;
             interactivityManager.OnInteractiveJoystickControlEvent -= HandleInteractiveJoystickControlEvent;
+            interactivityManager.OnInteractiveTextControlEvent -= HandleInteractiveTextControlEvent;
             interactivityManager.OnInteractiveMessageEvent -= HandleInteractiveMessageEvent;
 
             interactivityManager.OnError += HandleError;
@@ -141,6 +145,7 @@ public class MixerInteractive : MonoBehaviour
             interactivityManager.OnParticipantStateChanged += HandleParticipantStateChanged;
             interactivityManager.OnInteractiveButtonEvent += HandleInteractiveButtonEvent;
             interactivityManager.OnInteractiveJoystickControlEvent += HandleInteractiveJoystickControlEvent;
+            interactivityManager.OnInteractiveTextControlEvent += HandleInteractiveTextControlEvent; 
             interactivityManager.OnInteractiveMessageEvent += HandleInteractiveMessageEvent;
         }
         else
@@ -187,6 +192,11 @@ public class MixerInteractive : MonoBehaviour
     }
 
     private static void HandleInteractiveButtonEvent(object sender, InteractiveButtonEventArgs e)
+    {
+        queuedEvents.Add(e);
+    }
+
+    private void HandleInteractiveTextControlEvent(object sender, InteractiveTextEventArgs e)
     {
         queuedEvents.Add(e);
     }
@@ -319,6 +329,30 @@ public class MixerInteractive : MonoBehaviour
             participant = participantTrackingState.particpant;
         }
         return participant;
+    }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="controlID">The ID of the control to check for submissions.</param>
+    /// <returns></returns>
+    public static bool HasSubmissions(string controlID)
+    {
+        bool hasSubmissions = false;
+        // Get the control, check if the submit state is true.
+        InteractiveTextControl textControl = GetControl(controlID) as InteractiveTextControl;
+        if (textControl != null &&
+            GetText(controlID).Count > 0)
+        {
+            hasSubmissions = true;
+        }
+
+        if (hasSubmissions)
+        {
+            CaptureTransactionForControlID(controlID);
+        }
+
+        return hasSubmissions;
     }
 
     /// <summary>
@@ -491,6 +525,13 @@ public class MixerInteractive : MonoBehaviour
                         }
                         processedEvents.Add(interactiveEvent);
                         break;
+                    case InteractiveEventType.TextInput:
+                        if (OnInteractiveTextControlEvent != null)
+                        {
+                            OnInteractiveTextControlEvent(this, interactiveEvent as InteractiveTextEventArgs);
+                        }
+                        processedEvents.Add(interactiveEvent);
+                        break;
                     case InteractiveEventType.Error:
                         if (OnError != null)
                         {
@@ -535,7 +576,7 @@ public class MixerInteractive : MonoBehaviour
         if (buttonDown &&
             !ManuallyHandleSparkTransactions)
         {
-            CaptureTransactionForButtonID(controlID);
+            CaptureTransactionForButtonControlID(controlID);
         }
         return buttonDown;
     }
@@ -550,7 +591,7 @@ public class MixerInteractive : MonoBehaviour
         if (buttonPressed &&
             !ManuallyHandleSparkTransactions)
         {
-            CaptureTransactionForButtonID(controlID);
+            CaptureTransactionForButtonControlID(controlID);
         }
         return buttonPressed;
     }
@@ -565,7 +606,7 @@ public class MixerInteractive : MonoBehaviour
         if (buttonUp &&
             !ManuallyHandleSparkTransactions)
         {
-            CaptureTransactionForButtonID(controlID);
+            CaptureTransactionForButtonControlID(controlID);
         }
         return buttonUp;
     }
@@ -727,6 +768,16 @@ public class MixerInteractive : MonoBehaviour
     public static InteractiveControl GetControl(string controlID)
     {
         return InteractivityManager.SingletonInstance.GetControl(controlID);
+    }
+
+    /// <summary>
+    /// Returns a list of participants and the text they entered.
+    /// </summary>
+    /// <param name="controlID">String ID of the control.</param>
+    /// <returns>Returns a list of InteractiveTextResult objects. Returns an empty list if there was no input.</returns>
+    public static IList<InteractiveTextResult> GetText(string controlID)
+    {
+        return InteractivityManager.SingletonInstance.GetText(controlID);
     }
 
     /// <summary>
@@ -985,7 +1036,7 @@ public class MixerInteractive : MonoBehaviour
     }
 #endif
 
-    private static void CaptureTransactionForButtonID(string controlID)
+    private static void CaptureTransactionForButtonControlID(string controlID)
     {
         var buttons = Buttons;
         var buttonStateKeys = InteractivityManager._buttonStates.Keys;
@@ -995,6 +1046,21 @@ public class MixerInteractive : MonoBehaviour
             {
                 InteractivityManager.SingletonInstance.CaptureTransaction(
                     InteractivityManager._buttonStates[buttonStateKey].TransactionID
+                    );
+                break;
+            }
+        }
+    }
+
+    private static void CaptureTransactionForControlID(string controlID)
+    {
+        var transactionIDsStateKeys = InteractivityManager._transactionIDsState.Keys;
+        foreach (string transactionControlID in transactionIDsStateKeys)
+        {
+            if (transactionControlID == controlID)
+            {
+                InteractivityManager.SingletonInstance.CaptureTransaction(
+                    InteractivityManager._transactionIDsState[transactionControlID].transactionID
                     );
                 break;
             }
