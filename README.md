@@ -6,6 +6,10 @@ The Mixer Unity plugin helps you add features to your game that let the audience
 
 Checkout the Project's [Wiki](https://github.com/mixer/interactive-unity-plugin/wiki) for documentation, including a [Getting Started](https://github.com/mixer/interactive-unity-plugin/wiki/Getting-started) guide.
 
+## Doing something cool with Mixer?
+
+Are you doing something cool with Mixer? We'd love to hear about it. Send us an email at mixerdevinfo@microsoft.com.
+
 ## Having Trouble?
 
 We want to help you fix your problem. The most efficient way to do that is to open an issue in our [issue Tracker](https://github.com/Mixer/interactive-unity-plugin/issues).  
