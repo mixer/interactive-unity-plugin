@@ -8,7 +8,7 @@ Checkout the Project's [Wiki](https://github.com/mixer/interactive-unity-plugin/
 
 ## Doing something cool with Mixer?
 
-Are you doing something cool with Mixer? We'd love to hear about it. Send us an email at mixerdevinfo@microsoft.com.
+We'd love to hear about it. Send us an email at mixerdevinfo@microsoft.com.
 
 ## Having Trouble?
 
