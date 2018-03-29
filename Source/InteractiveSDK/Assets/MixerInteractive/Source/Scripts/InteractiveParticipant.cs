@@ -111,6 +111,24 @@ namespace Microsoft.Mixer
         }
 
         /// <summary>
+        /// Set to true if this user is the broadcaster.
+        /// </summary>
+        public bool IsBroadcaster
+        {
+            get
+            {
+                if (channelGroups.Contains("Owner"))
+                {
+                    return true;
+                }
+                else
+                {
+                    return false;
+                }
+            }
+        }
+
+        /// <summary>
         /// Set to true if the user's input has been disabled.
         /// </summary>
         public bool InputDisabled
@@ -191,12 +209,14 @@ namespace Microsoft.Mixer
         internal string etag;
         internal string groupID;
         internal string sessionID;
+        private List<string> channelGroups;
 
-        internal InteractiveParticipant(string newSessionID, string newEtag, uint userID, string newGroupID, string userName, uint level, DateTime lastInputAt, DateTime connectedAt, bool inputDisabled, InteractiveParticipantState state)
+        internal InteractiveParticipant(string newSessionID, string newEtag, uint userID, string newGroupID, string userName, List<string> newChannelGroups, uint level, DateTime lastInputAt, DateTime connectedAt, bool inputDisabled, InteractiveParticipantState state)
         {
             sessionID = newSessionID;
             UserID = userID;
             UserName = userName;
+            channelGroups = newChannelGroups;
             Level = level;
             LastInputAt = lastInputAt;
             ConnectedAt = connectedAt;
