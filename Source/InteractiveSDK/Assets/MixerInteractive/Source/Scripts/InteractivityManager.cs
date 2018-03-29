@@ -276,20 +276,22 @@ namespace Microsoft.Mixer
             {
                 _authToken = authToken;
             }
-            // On Xbox Live platforms, we try to get an Xbox Live token
-#if !UNITY_EDITOR && UNITY_XBOXONE
-            
-            var tokenData = new string(' ', 10240);
-            GCHandle pinnedMemory = GCHandle.Alloc(tokenData, GCHandleType.Pinned);
-            System.IntPtr dataPointer = pinnedMemory.AddrOfPinnedObject();
-            bool getXTokenSucceeded = MixerEraNativePlugin_GetXToken(dataPointer);
-            if (!getXTokenSucceeded)
+            else
             {
-                LogError("Error: Could not get a Xbox Live token. Make sure you have a user signed in.");
-            }
-            _authToken = Marshal.PtrToStringAnsi(dataPointer);
-            pinnedMemory.Free();
+#if !UNITY_EDITOR && UNITY_XBOXONE
+                // On Xbox Live platforms, we try to get an Xbox Live token
+                var tokenData = new string(' ', 10240);
+                GCHandle pinnedMemory = GCHandle.Alloc(tokenData, GCHandleType.Pinned);
+                System.IntPtr dataPointer = pinnedMemory.AddrOfPinnedObject();
+                bool getXTokenSucceeded = MixerEraNativePlugin_GetXToken(dataPointer);
+                if (!getXTokenSucceeded)
+                {
+                    LogError("Error: Could not get a Xbox Live token. Make sure you have a user signed in.");
+                }
+                _authToken = Marshal.PtrToStringAnsi(dataPointer);
+                pinnedMemory.Free();
 #endif
+            }
             InitiateConnection();
         }
 
@@ -1829,6 +1831,7 @@ namespace Microsoft.Mixer
             string groupID = string.Empty;
             uint interactiveLevel = 0;
             bool inputDisabled = false;
+            List<string> channelGroups = new List<string>();
             double connectedAtMillisecondsPastEpoch = 0;
             double lastInputAtMillisecondsPastEpoch = 0;
             DateTime lastInputAt = new DateTime();
@@ -1889,6 +1892,20 @@ namespace Microsoft.Mixer
                                 jsonReader.ReadAsBoolean();
                                 inputDisabled = (bool)jsonReader.Value;
                                 break;
+                            case WS_MESSAGE_KEY_CHANNEL_GROUPS:
+                                // Read channel groups
+                                while (jsonReader.Read())
+                                {
+                                    if (jsonReader.TokenType == JsonToken.EndArray)
+                                    {
+                                        break;
+                                    }
+                                    if (jsonReader.Value != null)
+                                    {
+                                        channelGroups.Add(jsonReader.Value.ToString());
+                                    }
+                                }
+                                break;
                             default:
                                 // No-op
                                 break;
@@ -1897,7 +1914,7 @@ namespace Microsoft.Mixer
                 }
             }
             InteractiveParticipantState participantState = inputDisabled ? InteractiveParticipantState.InputDisabled : InteractiveParticipantState.Joined;
-            return new InteractiveParticipant(sessionID, etag, Id, groupID, interactiveUserName, interactiveLevel, lastInputAt, connectedAt, inputDisabled, participantState);
+            return new InteractiveParticipant(sessionID, etag, Id, groupID, interactiveUserName, channelGroups, interactiveLevel, lastInputAt, connectedAt, inputDisabled, participantState);
         }
 
         private void HandleGetGroups(JsonReader jsonReader)
@@ -3352,6 +3369,7 @@ namespace Microsoft.Mixer
         // Keys
         private const string WS_MESSAGE_KEY_ACCESS_TOKEN_FROM_FILE = "AuthToken";
         private const string WS_MESSAGE_KEY_APPID = "appid";
+        private const string WS_MESSAGE_KEY_CHANNEL_GROUPS = "channelGroups";
         private const string WS_MESSAGE_KEY_CODE = "code";
         private const string WS_MESSAGE_KEY_COOLDOWN = "cooldown";
         private const string WS_MESSAGE_KEY_CONNECTED_AT = "connectedAt";
