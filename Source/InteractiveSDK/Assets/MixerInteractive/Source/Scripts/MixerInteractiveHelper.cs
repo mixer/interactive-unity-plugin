@@ -326,6 +326,7 @@ internal class MixerInteractiveHelper: MonoBehaviour
 
     private void WriteAuthTokensToCacheImpl()
     {
+        _queuedWriteAuthTokensToCacheRequest = false;
         PlayerPrefs.SetString("MixerInteractive-AuthToken", _authTokenValueToWriteToCache);
         PlayerPrefs.SetString("MixerInteractive-RefreshToken", _refreshTokenValueToWriteToCache);
         PlayerPrefs.Save();
