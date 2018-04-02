@@ -43,11 +43,6 @@ public class InteractiveSettingsWindow : EditorWindow
     private static bool wasPaused;
     private static bool initialized;
 
-    // Control indexes
-    private static int CONTROL_DROPDOWN_BUTTON_INDEX = 0;
-    private static int CONTROL_JOYSTICK_BUTTON_INDEX = 1;
-
-    private static string[] controlOptions;
     private static string[] logLevelOptions;
     private bool existingProjectInformation;
 
@@ -80,11 +75,6 @@ public class InteractiveSettingsWindow : EditorWindow
 
         titleContent = new GUIContent("Interactive Editor");
         EditorStyles.textArea.wordWrap = true;
-
-        controlOptions = new string[]
-           {
-                "Button", "Joystick"
-           };
 
         logLevelOptions = new string[]
            {
