@@ -59,7 +59,7 @@ namespace Microsoft.Mixer
                 text);
         }
 
-        public InteractiveLabelControl(string controlID, InteractiveEventType type, string text, string sceneID) : base(controlID, InteractivityManager.CONTROL_TYPE_BUTTON, type, false, "", "", sceneID)
+        public InteractiveLabelControl(string controlID, string text, string sceneID) : base(controlID, InteractivityManager.CONTROL_KIND_LABEL, InteractiveEventType.Unknown, false, "", "", sceneID)
         {
             Text = text;
         }

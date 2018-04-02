@@ -2122,7 +2122,7 @@ namespace Microsoft.Mixer
             string controlID = string.Empty;
             uint cost = 0;
             bool disabled = false;
-            string helpText = string.Empty;
+            string text = string.Empty;
             string eTag = string.Empty;
             string kind = string.Empty;
             try
@@ -2144,7 +2144,7 @@ namespace Microsoft.Mixer
                                 break;
                             case WS_MESSAGE_KEY_TEXT:
                                 jsonReader.Read();
-                                helpText = jsonReader.Value.ToString();
+                                text = jsonReader.Value.ToString();
                                 break;
                             case WS_MESSAGE_KEY_ETAG:
                                 jsonReader.Read();
@@ -2171,19 +2171,23 @@ namespace Microsoft.Mixer
             }
             if (kind == WS_MESSAGE_VALUE_CONTROL_TYPE_BUTTON)
             {
-                newControl = new InteractiveButtonControl(controlID, InteractiveEventType.Button, disabled, helpText, cost, eTag, sceneID);
+                newControl = new InteractiveButtonControl(controlID, InteractiveEventType.Button, disabled, text, cost, eTag, sceneID);
             }
             else if (kind == WS_MESSAGE_VALUE_CONTROL_TYPE_JOYSTICK)
             {
-                newControl = new InteractiveJoystickControl(controlID, InteractiveEventType.Joystick, disabled, helpText, eTag, sceneID);
+                newControl = new InteractiveJoystickControl(controlID, InteractiveEventType.Joystick, disabled, text, eTag, sceneID);
             }
             else if (kind == WS_MESSAGE_VALUE_CONTROL_TYPE_TEXTBOX)
             {
-                newControl = new InteractiveTextControl(controlID, InteractiveEventType.TextInput, disabled, helpText, eTag, sceneID);
+                newControl = new InteractiveTextControl(controlID, InteractiveEventType.TextInput, disabled, text, eTag, sceneID);
+            }
+            else if (kind == WS_MESSAGE_VALUE_CONTROL_TYPE_LABEL)
+            {
+                newControl = new InteractiveLabelControl(controlID, text, sceneID);
             }
             else
             {
-                newControl = new InteractiveControl(controlID, kind, InteractiveEventType.Unknown, disabled, helpText, eTag, sceneID);
+                newControl = new InteractiveControl(controlID, kind, InteractiveEventType.Unknown, disabled, text, eTag, sceneID);
             }
             return newControl;
         }
@@ -3424,6 +3428,7 @@ namespace Microsoft.Mixer
         internal const string WS_MESSAGE_VALUE_DEFAULT_GROUP_ID = "default";
         internal const string WS_MESSAGE_VALUE_DEFAULT_SCENE_ID = "default";
         private const string WS_MESSAGE_VALUE_CONTROL_TYPE_JOYSTICK = "joystick";
+        internal const string WS_MESSAGE_VALUE_CONTROL_TYPE_LABEL = "label";
         internal const string WS_MESSAGE_VALUE_CONTROL_TYPE_TEXTBOX = "textbox";
         private const bool WS_MESSAGE_VALUE_TRUE = true;
 
@@ -3467,6 +3472,7 @@ namespace Microsoft.Mixer
         // Input
         internal const string CONTROL_TYPE_BUTTON = "button";
         internal const string CONTROL_TYPE_JOYSTICK = "joystick";
+        internal const string CONTROL_KIND_LABEL = "label";
         internal const string CONTROL_KIND_TEXTBOX = "textbox";
 
         // Event names
