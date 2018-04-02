@@ -59,11 +59,10 @@ namespace Microsoft.Mixer
             private set;
         }
 
-        internal string ETag;
-        internal string SceneID;
-        internal string Kind;
-        internal InteractiveEventType Type;
-        internal int participantID;
+        internal string _eTag;
+        internal string _sceneID;
+        internal string _kind;
+        internal InteractiveEventType _type;
 
         /// <summary>
         /// Allow game client to disable a control.
@@ -72,9 +71,9 @@ namespace Microsoft.Mixer
         public void SetDisabled(bool disabled)
         {
             Disabled = disabled;
-            InteractivityManager.SingletonInstance.SendSetButtonControlProperties(
+            InteractivityManager.SingletonInstance._SendSetButtonControlProperties(
                 ControlID, 
-                InteractivityManager.WS_MESSAGE_VALUE_DISABLED, 
+                InteractivityManager._WS_MESSAGE_VALUE_DISABLED, 
                 disabled,
                 0,
                 string.Empty,
@@ -89,7 +88,7 @@ namespace Microsoft.Mixer
         public void SetProperty(InteractiveControlProperty name, object value)
         {
             SetPropertyImpl(
-                InteractivityManager.SingletonInstance.InteractiveControlPropertyToString(name), 
+                InteractivityManager.SingletonInstance._InteractiveControlPropertyToString(name), 
                 value
                 );
         }
@@ -106,19 +105,18 @@ namespace Microsoft.Mixer
 
         private void SetPropertyImpl(string name, object value)
         {
-            InteractivityManager.SingletonInstance.QueuePropertyUpdate(SceneID, ControlID, name, value);
+            InteractivityManager.SingletonInstance._QueuePropertyUpdate(_sceneID, ControlID, name, value);
         }
 
         internal InteractiveControl(string controlID, string kind, InteractiveEventType type, bool disabled, string helpText, string eTag, string sceneID)
         {
             ControlID = controlID;
-            Kind = kind;
-            Type = type;
+            _kind = kind;
+            _type = type;
             Disabled = disabled;
             HelpText = helpText;
-            ETag = eTag;
-            SceneID = sceneID;
-            participantID = -1;
+            _eTag = eTag;
+            _sceneID = sceneID;
         }
     }
 }

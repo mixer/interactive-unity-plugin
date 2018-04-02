@@ -52,14 +52,14 @@ namespace Microsoft.Mixer
         public void SetText(string text)
         {
             InteractivityManager interactivityManager = InteractivityManager.SingletonInstance;
-            interactivityManager.QueuePropertyUpdate(
-                SceneID, 
+            interactivityManager._QueuePropertyUpdate(
+                _sceneID, 
                 ControlID,
-                interactivityManager.InteractiveControlPropertyToString(InteractiveControlProperty.Text), 
+                interactivityManager._InteractiveControlPropertyToString(InteractiveControlProperty.Text), 
                 text);
         }
 
-        public InteractiveLabelControl(string controlID, InteractiveEventType type, string text, string sceneID) : base(controlID, InteractivityManager.CONTROL_TYPE_BUTTON, type, false, "", "", sceneID)
+        public InteractiveLabelControl(string controlID, InteractiveEventType type, string text, string sceneID) : base(controlID, InteractivityManager._CONTROL_TYPE_BUTTON, type, false, "", "", sceneID)
         {
             Text = text;
         }

@@ -62,7 +62,7 @@ namespace Microsoft.Mixer
             get
             {
                 Int64 now = (Int64)DateTime.UtcNow.ToUniversalTime().Subtract(new DateTime(1970, 1, 1)).TotalMilliseconds;
-                int timeRemaining = (int)(cooldownExpirationTime - now);
+                int timeRemaining = (int)(_cooldownExpirationTime - now);
                 if (timeRemaining < 0)
                 {
                     timeRemaining = 0;
@@ -90,7 +90,7 @@ namespace Microsoft.Mixer
                 bool isDown = false;
                 if (ControlID != null)
                 {
-                    InternalButtonCountState ButtonCountState;
+                    _InternalButtonCountState ButtonCountState;
                     if (InteractivityManager._buttonStates.TryGetValue(ControlID, out ButtonCountState))
                     {
                         isDown = ButtonCountState.CountOfButtonDownEvents > 0;
@@ -110,7 +110,7 @@ namespace Microsoft.Mixer
                 bool isPressed = false;
                 if (ControlID != null)
                 {
-                    InternalButtonCountState ButtonCountState;
+                    _InternalButtonCountState ButtonCountState;
                     if (InteractivityManager._buttonStates.TryGetValue(ControlID, out ButtonCountState))
                     {
                         isPressed = ButtonCountState.CountOfButtonPressEvents > 0;
@@ -130,7 +130,7 @@ namespace Microsoft.Mixer
                 bool isUp = false;
                 if (ControlID != null)
                 {
-                    InternalButtonCountState ButtonCountState;
+                    _InternalButtonCountState ButtonCountState;
                     if (InteractivityManager._buttonStates.TryGetValue(ControlID, out ButtonCountState))
                     {
                         isUp = ButtonCountState.CountOfButtonUpEvents > 0;
@@ -150,7 +150,7 @@ namespace Microsoft.Mixer
                 uint countOfButtonDownEvents = 0;
                 if (ControlID != null)
                 {
-                    InternalButtonCountState ButtonCountState;
+                    _InternalButtonCountState ButtonCountState;
                     if (InteractivityManager._buttonStates.TryGetValue(ControlID, out ButtonCountState))
                     {
                         countOfButtonDownEvents = ButtonCountState.CountOfButtonDownEvents;
@@ -170,7 +170,7 @@ namespace Microsoft.Mixer
                 uint countOfButtonPressEvents = 0;
                 if (ControlID != null)
                 {
-                    InternalButtonCountState ButtonCountState;
+                    _InternalButtonCountState ButtonCountState;
                     if (InteractivityManager._buttonStates.TryGetValue(ControlID, out ButtonCountState))
                     {
                         countOfButtonPressEvents = ButtonCountState.CountOfButtonPressEvents;
@@ -190,7 +190,7 @@ namespace Microsoft.Mixer
                 uint countOfButtonPressEvents = 0;
                 if (ControlID != null)
                 {
-                    InternalButtonCountState ButtonCountState;
+                    _InternalButtonCountState ButtonCountState;
                     if (InteractivityManager._buttonStates.TryGetValue(ControlID, out ButtonCountState))
                     {
                         countOfButtonPressEvents = ButtonCountState.CountOfButtonUpEvents;
@@ -206,9 +206,9 @@ namespace Microsoft.Mixer
         /// <param name="progress">Value from 0.0 to 1.0.</param>
         public void SetProgress(float progress)
         {
-            InteractivityManager.SingletonInstance.SendSetButtonControlProperties(
+            InteractivityManager.SingletonInstance._SendSetButtonControlProperties(
                 ControlID,
-                InteractivityManager.WS_MESSAGE_KEY_PROGRESS,
+                InteractivityManager._WS_MESSAGE_KEY_PROGRESS,
                 false,
                 progress,
                 string.Empty,
@@ -221,9 +221,9 @@ namespace Microsoft.Mixer
         /// <param name="text">String to display on the button.</param>
         public void SetText(string text)
         {
-            InteractivityManager.SingletonInstance.SendSetButtonControlProperties(
+            InteractivityManager.SingletonInstance._SendSetButtonControlProperties(
                 ControlID,
-                InteractivityManager.WS_MESSAGE_KEY_TEXT,
+                InteractivityManager._WS_MESSAGE_KEY_TEXT,
                 false,
                 0,
                 text,
@@ -236,9 +236,9 @@ namespace Microsoft.Mixer
         /// <param name="cost">The number of sparks for this action.</param>
         public void SetCost(uint cost)
         {
-            InteractivityManager.SingletonInstance.SendSetButtonControlProperties(
+            InteractivityManager.SingletonInstance._SendSetButtonControlProperties(
                 ControlID,
-                InteractivityManager.WS_MESSAGE_KEY_COST,
+                InteractivityManager._WS_MESSAGE_KEY_COST,
                 false,
                 0,
                 string.Empty,
@@ -251,7 +251,7 @@ namespace Microsoft.Mixer
         /// <param name="userID">The ID of the user who used the input control.</param>
         public bool GetButtonDown(uint userID)
         {
-            return InteractivityManager.SingletonInstance.GetButtonDown(ControlID, userID);
+            return InteractivityManager.SingletonInstance._GetButtonDown(ControlID, userID);
         }
 
         /// <summary>
@@ -260,7 +260,7 @@ namespace Microsoft.Mixer
         /// <param name="userID">The ID of the user who used the input control.</param>
         public bool GetButtonPressed(uint userID)
         {
-            return InteractivityManager.SingletonInstance.GetButtonPressed(ControlID, userID);
+            return InteractivityManager.SingletonInstance._GetButtonPressed(ControlID, userID);
         }
 
         /// <summary>
@@ -269,7 +269,7 @@ namespace Microsoft.Mixer
         /// <param name="userID">The ID of the user who used the input control.</param>
         public bool GetButtonUp(uint userID)
         {
-            return InteractivityManager.SingletonInstance.GetButtonUp(ControlID, userID);
+            return InteractivityManager.SingletonInstance._GetButtonUp(ControlID, userID);
         }
 
         /// <summary>
@@ -278,7 +278,7 @@ namespace Microsoft.Mixer
         /// <param name="userID">The ID of the user who used the input control.</param>
         public uint GetCountOfButtonDowns(uint userID)
         {
-            return InteractivityManager.SingletonInstance.GetCountOfButtonDowns(ControlID, userID);
+            return InteractivityManager.SingletonInstance._GetCountOfButtonDowns(ControlID, userID);
         }
 
         /// <summary>
@@ -287,7 +287,7 @@ namespace Microsoft.Mixer
         /// <param name="userID">The ID of the user who used the input control.</param>
         public uint GetCountOfButtonPresses(uint userID)
         {
-            return InteractivityManager.SingletonInstance.GetCountOfButtonPresses(ControlID, userID);
+            return InteractivityManager.SingletonInstance._GetCountOfButtonPresses(ControlID, userID);
         }
 
         /// <summary>
@@ -296,7 +296,7 @@ namespace Microsoft.Mixer
         /// <param name="userID">The ID of the user who used the input control.</param>
         public uint GetCountOfButtonUps(uint userID)
         {
-            return InteractivityManager.SingletonInstance.GetCountOfButtonUps(ControlID, userID);
+            return InteractivityManager.SingletonInstance._GetCountOfButtonUps(ControlID, userID);
         }
 
         /// <summary>
@@ -308,8 +308,8 @@ namespace Microsoft.Mixer
             InteractivityManager.SingletonInstance.TriggerCooldown(ControlID, cooldown);
         }
 
-        internal Int64 cooldownExpirationTime;
-        public InteractiveButtonControl(string controlID, InteractiveEventType type, bool disabled, string helpText, uint cost, string eTag, string sceneID) : base(controlID, InteractivityManager.CONTROL_TYPE_BUTTON, type, disabled, helpText, eTag, sceneID)
+        internal Int64 _cooldownExpirationTime;
+        public InteractiveButtonControl(string controlID, InteractiveEventType type, bool disabled, string helpText, uint cost, string eTag, string sceneID) : base(controlID, InteractivityManager._CONTROL_TYPE_BUTTON, type, disabled, helpText, eTag, sceneID)
         {
             Cost = cost;
         }

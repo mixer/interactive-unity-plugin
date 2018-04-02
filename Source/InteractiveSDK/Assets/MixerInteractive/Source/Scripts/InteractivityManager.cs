@@ -80,8 +80,17 @@ namespace Microsoft.Mixer
         internal delegate void OnInteractiveTextControlEventHandler(object sender, InteractiveTextEventArgs e);
         internal event OnInteractiveTextControlEventHandler OnInteractiveTextControlEvent;
 
+        public delegate void OnInteractiveMouseButtonEventHandler(object sender, InteractiveMouseButtonEventArgs e);
+        public event OnInteractiveMouseButtonEventHandler OnInteractiveMouseButtonEvent;
+
+        public delegate void OnInteractiveCoordinatesChangedHandler(object sender, InteractiveCoordinatesChangedEventArgs e);
+        public event OnInteractiveCoordinatesChangedHandler OnInteractiveCoordinatesChangedEvent;
+
         public delegate void OnInteractiveMessageEventHandler(object sender, InteractiveMessageEventArgs e);
         public event OnInteractiveMessageEventHandler OnInteractiveMessageEvent;
+
+        public delegate void OnInteractiveDoWorkEventHandler(object sender, InteractiveEventArgs e);
+        public event OnInteractiveDoWorkEventHandler OnInteractiveDoWorkEvent;
 
         private static InteractivityManager _singletonInstance;
 
@@ -340,13 +349,13 @@ namespace Microsoft.Mixer
             {
                 mixerInteractiveHelper.OnInternalWebRequestStateChanged -= OnRequestWebSocketHostsCompleted;
                 mixerInteractiveHelper.OnInternalWebRequestStateChanged += OnRequestWebSocketHostsCompleted;
-                mixerInteractiveHelper.MakeWebRequest(
+                mixerInteractiveHelper._MakeWebRequest(
                     "OnRequestWebSocketHostsCompleted",
                     WEBSOCKET_DISCOVERY_URL);
             }
             catch (Exception ex)
             {
-                LogError("Error: Could not retrieve the URL for the websocket. Exception details: " + ex.Message);
+                _LogError("Error: Could not retrieve the URL for the websocket. Exception details: " + ex.Message);
             }
         }
 
@@ -396,7 +405,7 @@ namespace Microsoft.Mixer
             }
         }
 
-        private void OnRequestWebSocketHostsCompleted(object sender, MixerInteractiveHelper.InternalWebRequestStateChangedEventArgs e)
+        private void OnRequestWebSocketHostsCompleted(object sender, MixerInteractiveHelper._InternalWebRequestStateChangedEventArgs e)
         {
             if (e.RequestID != "OnRequestWebSocketHostsCompleted")
             {
@@ -409,7 +418,7 @@ namespace Microsoft.Mixer
             }
             else
             {
-                LogError("Error: Could not retrieve the URL for the websocket. Exception details: " + e.ErrorMessage);
+                _LogError("Error: Could not retrieve the URL for the websocket. Exception details: " + e.ErrorMessage);
             }
         }
 
@@ -466,7 +475,7 @@ namespace Microsoft.Mixer
                 }
                 catch
                 {
-                    LogError("Error: interactiveconfig.json file could not be read. Make sure it is valid JSON and has the correct format.");
+                    _LogError("Error: interactiveconfig.json file could not be read. Make sure it is valid JSON and has the correct format.");
                 }
             }
             else
@@ -482,11 +491,11 @@ namespace Microsoft.Mixer
 
         private void TryGetTokenAsync()
         {
-            Log("Trying to obtain a new OAuth token. This is an expected and repeated call.");
+            _Log("Trying to obtain a new OAuth token. This is an expected and repeated call.");
 
             mixerInteractiveHelper.OnInternalWebRequestStateChanged -= OnRequestOAuthExchangeTokenCompleted;
             mixerInteractiveHelper.OnInternalWebRequestStateChanged += OnRequestOAuthExchangeTokenCompleted;
-            mixerInteractiveHelper.MakeWebRequest(
+            mixerInteractiveHelper._MakeWebRequest(
                 "OnRequestOAuthExchangeTokenCompleted",
                 API_CHECK_SHORT_CODE_AUTH_STATUS_PATH + _authShortCodeRequestHandle,
                 new Dictionary<string, string>()
@@ -496,7 +505,7 @@ namespace Microsoft.Mixer
             );
         }
 
-        private void OnRequestOAuthExchangeTokenCompleted(object sender, MixerInteractiveHelper.InternalWebRequestStateChangedEventArgs e)
+        private void OnRequestOAuthExchangeTokenCompleted(object sender, MixerInteractiveHelper._InternalWebRequestStateChangedEventArgs e)
         {
             if (e.RequestID != "OnRequestOAuthExchangeTokenCompleted")
             {
@@ -509,7 +518,7 @@ namespace Microsoft.Mixer
             }
             else
             {
-                LogError("Error: Failed to request an OAuth exchange token. Error message: " + e.ErrorMessage);
+                _LogError("Error: Failed to request an OAuth exchange token. Error message: " + e.ErrorMessage);
             }
         }
 
@@ -554,12 +563,12 @@ namespace Microsoft.Mixer
 
         private void GetOauthToken(string exchangeCode)
         {
-            Log("Retrieved an OAuth exchange token. Exchange token: " + exchangeCode + " Using AppID: " + AppID + " with exchange code: " + exchangeCode);
+            _Log("Retrieved an OAuth exchange token. Exchange token: " + exchangeCode + " Using AppID: " + AppID + " with exchange code: " + exchangeCode);
 
             string postData = "{ \"client_id\": \"" + AppID + "\", \"code\": \"" + exchangeCode + "\", \"grant_type\": \"authorization_code\" }";
             mixerInteractiveHelper.OnInternalWebRequestStateChanged -= OnRequestOAuthTokenCompleted;
             mixerInteractiveHelper.OnInternalWebRequestStateChanged += OnRequestOAuthTokenCompleted;
-            mixerInteractiveHelper.MakeWebRequest(
+            mixerInteractiveHelper._MakeWebRequest(
                 "OnRequestOAuthTokenCompleted",
                 API_GET_OAUTH_TOKEN_PATH,
                 new Dictionary<string, string>()
@@ -571,7 +580,7 @@ namespace Microsoft.Mixer
             );
         }
 
-        private void OnRequestOAuthTokenCompleted(object sender, MixerInteractiveHelper.InternalWebRequestStateChangedEventArgs e)
+        private void OnRequestOAuthTokenCompleted(object sender, MixerInteractiveHelper._InternalWebRequestStateChangedEventArgs e)
         {
             if (e.RequestID != "OnRequestOAuthTokenCompleted")
             {
@@ -584,7 +593,7 @@ namespace Microsoft.Mixer
             }
             else
             {
-                LogError("Error: Failed to request an OAuth token. Error message: " + e.ErrorMessage);
+                _LogError("Error: Failed to request an OAuth token. Error message: " + e.ErrorMessage);
             }
         }
 
@@ -592,7 +601,7 @@ namespace Microsoft.Mixer
         {
             if (statusCode == 400)
             {
-                LogError("Error: " + getCodeServerResponse + " while requesting an OAuth token.");
+                _LogError("Error: " + getCodeServerResponse + " while requesting an OAuth token.");
                 return;
             }
             string refreshToken = string.Empty;
@@ -622,7 +631,7 @@ namespace Microsoft.Mixer
 
             mixerInteractiveHelper.WriteAuthTokensToCache(_authToken, _oauthRefreshToken);
 
-            Log("Retrieved a new OAuth token. Token: " + _authToken);
+            _Log("Retrieved a new OAuth token. Token: " + _authToken);
 
             mixerInteractiveHelper.StopTimer(MixerInteractiveHelper.InteractiveTimerType.RefreshShortCode);
             mixerInteractiveHelper.StopTimer(MixerInteractiveHelper.InteractiveTimerType.CheckAuthStatus);
@@ -635,7 +644,7 @@ namespace Microsoft.Mixer
             string postData = "{ \"client_id\": \"" + AppID + "\", \"scope\": \"interactive:robot:self\" }";
             mixerInteractiveHelper.OnInternalWebRequestStateChanged -= OnRequestRefresheShortCodeCompleted;
             mixerInteractiveHelper.OnInternalWebRequestStateChanged += OnRequestRefresheShortCodeCompleted;
-            mixerInteractiveHelper.MakeWebRequest(
+            mixerInteractiveHelper._MakeWebRequest(
                 "OnRequestRefresheShortCodeCompleted",
                 API_GET_SHORT_CODE_PATH,
                 new Dictionary<string, string>()
@@ -647,7 +656,7 @@ namespace Microsoft.Mixer
            );
         }
 
-        private void OnRequestRefresheShortCodeCompleted(object sender, MixerInteractiveHelper.InternalWebRequestStateChangedEventArgs e)
+        private void OnRequestRefresheShortCodeCompleted(object sender, MixerInteractiveHelper._InternalWebRequestStateChangedEventArgs e)
         {
             if (e.RequestID != "OnRequestRefresheShortCodeCompleted")
             {
@@ -658,14 +667,14 @@ namespace Microsoft.Mixer
             {
                 if (e.ResponseCode == 404)
                 {
-                    LogError("Error: OAuth Client ID not found. Make sure the OAuth Client ID you specified in the Unity editor matches the one in Interactive Studio.");
+                    _LogError("Error: OAuth Client ID not found. Make sure the OAuth Client ID you specified in the Unity editor matches the one in Interactive Studio.");
                     return;
                 }
                 CompleteRefreshShortCode(e.ResponseText);
             }
             else
             {
-                LogError("Error: Failed to retrieve a short code for short code authentication. Error message: " + e.ErrorMessage);
+                _LogError("Error: Failed to retrieve a short code for short code authentication. Error message: " + e.ErrorMessage);
             }
         }
 
@@ -734,7 +743,7 @@ namespace Microsoft.Mixer
         {
             mixerInteractiveHelper.OnInternalWebRequestStateChanged -= OnVerifyAuthTokenRequestCompleted;
             mixerInteractiveHelper.OnInternalWebRequestStateChanged += OnVerifyAuthTokenRequestCompleted;
-            mixerInteractiveHelper.MakeWebRequest(
+            mixerInteractiveHelper._MakeWebRequest(
                 "OnVerifyAuthTokenRequestCompleted",
                 _interactiveWebSocketUrl.Replace("wss", "https"),
                 new Dictionary<string, string>()
@@ -747,7 +756,7 @@ namespace Microsoft.Mixer
             return;
         }
 
-        private void OnVerifyAuthTokenRequestCompleted(object sender, MixerInteractiveHelper.InternalWebRequestStateChangedEventArgs e)
+        private void OnVerifyAuthTokenRequestCompleted(object sender, MixerInteractiveHelper._InternalWebRequestStateChangedEventArgs e)
         {
             if (e.RequestID != "OnVerifyAuthTokenRequestCompleted")
             {
@@ -770,13 +779,13 @@ namespace Microsoft.Mixer
                 }
                 else
                 {
-                    LogError("Error: Failed to while trying to validate a cached auth token. Error code: " + e.ResponseCode);
+                    _LogError("Error: Failed to while trying to validate a cached auth token. Error code: " + e.ResponseCode);
                 }
                 CompleteVerifyAuthTokenRequestStart(isTokenValid);
             }
             else
             {
-                LogError("Error: Failed to verify the auth token. Error message: " + e.ErrorMessage);
+                _LogError("Error: Failed to verify the auth token. Error message: " + e.ErrorMessage);
             }
         }
 
@@ -811,7 +820,7 @@ namespace Microsoft.Mixer
             {
                 shareCodeDebugLogString = ", Share Code: " + ShareCode;
             }
-            Log("Connecting to websocket with Project Version ID: " + ProjectVersionID +
+            _Log("Connecting to websocket with Project Version ID: " + ProjectVersionID +
                 shareCodeDebugLogString +
                 ", OAuth Client ID: " + AppID +
                 " and Auth Token: " + _authToken + ".");
@@ -916,7 +925,7 @@ namespace Microsoft.Mixer
 #endif
         {
             UpdateInteractivityState(InteractivityState.InteractivityDisabled);
-            LogError("Error: Websocket OnError: " + args.Message);
+            _LogError("Error: Websocket OnError: " + args.Message);
         }
 
 #if UNITY_WSA && !UNITY_EDITOR
@@ -930,17 +939,17 @@ namespace Microsoft.Mixer
             UpdateInteractivityState(InteractivityState.InteractivityDisabled);
             if (args.Code == 4019)
             {
-                LogError("Connection failed (error code 4019): You don't have access to this project. Make sure that the account you are signed in with has " +
+                _LogError("Connection failed (error code 4019): You don't have access to this project. Make sure that the account you are signed in with has " +
                     "access to this Version ID. If you are using a share code, make sure that the share code value matches the one in Interactive Studio for this project.");
             }
             else if (args.Code == 4020)
             {
-                LogError("Connection failed (error code 4020): The interactive version was not found or you do not have access to it. Make sure that the account you are signed in with has " +
+                _LogError("Connection failed (error code 4020): The interactive version was not found or you do not have access to it. Make sure that the account you are signed in with has " +
                     "access to this Version ID. If you are using a share code, make sure that the share code value matches the one in Interactive Studio for this project.");
             }
             else if (args.Code == 4021)
             {
-                LogError("Connection failed (error code 4021): You are connected to this session somewhere else. Please disconnect from that session and try again.");
+                _LogError("Connection failed (error code 4021): You are connected to this session somewhere else. Please disconnect from that session and try again.");
             }
             else
             {
@@ -964,7 +973,7 @@ namespace Microsoft.Mixer
             string postData = "{ \"client_id\": \"" + AppID + "\", \"refresh_token\": \"" + _oauthRefreshToken + "\", \"grant_type\": \"refresh_token\" }";
             mixerInteractiveHelper.OnInternalWebRequestStateChanged -= OnRequestRefreshedAuthTokenCompleted;
             mixerInteractiveHelper.OnInternalWebRequestStateChanged += OnRequestRefreshedAuthTokenCompleted;
-            mixerInteractiveHelper.MakeWebRequest(
+            mixerInteractiveHelper._MakeWebRequest(
                 "OnRequestRefreshedAuthTokenCompleted",
                 API_GET_OAUTH_TOKEN_PATH,
                 new Dictionary<string, string>()
@@ -976,7 +985,7 @@ namespace Microsoft.Mixer
             );
         }
 
-        private void OnRequestRefreshedAuthTokenCompleted(object sender, MixerInteractiveHelper.InternalWebRequestStateChangedEventArgs e)
+        private void OnRequestRefreshedAuthTokenCompleted(object sender, MixerInteractiveHelper._InternalWebRequestStateChangedEventArgs e)
         {
             if (e.RequestID != "OnRequestRefreshedAuthTokenCompleted")
             {
@@ -989,7 +998,7 @@ namespace Microsoft.Mixer
             }
             else
             {
-                LogError("Error: Web request to refresh the Auth token failed. Error message: " + e.ErrorMessage);
+                _LogError("Error: Web request to refresh the Auth token failed. Error message: " + e.ErrorMessage);
             }
         }
 
@@ -997,7 +1006,7 @@ namespace Microsoft.Mixer
         {
             if (statusCode == 400)
             {
-                LogError("Error: " + getCodeServerResponse + " trying to refresh the auth token.");
+                _LogError("Error: " + getCodeServerResponse + " trying to refresh the auth token.");
             }
             string accessToken = string.Empty;
             string refreshToken = string.Empty;
@@ -1057,7 +1066,7 @@ namespace Microsoft.Mixer
             {
                 return;
             }
-            SendCaptureTransactionMessage(transactionID);
+            _SendCaptureTransactionMessage(transactionID);
         }
 
         /// <summary>
@@ -1074,7 +1083,7 @@ namespace Microsoft.Mixer
 
             if (cooldown < 1000)
             {
-                Log("Info: Did you mean to use a cooldown of " + (float)cooldown / 1000 + " seconds? Remember, cooldowns are in milliseconds.");
+                _Log("Info: Did you mean to use a cooldown of " + (float)cooldown / 1000 + " seconds? Remember, cooldowns are in milliseconds.");
             }
 
             // Get the control from our data structure to find it's etag
@@ -1086,11 +1095,11 @@ namespace Microsoft.Mixer
                 InteractiveButtonControl button = control as InteractiveButtonControl;
                 if (button != null)
                 {
-                    controlSceneID = control.SceneID;
+                    controlSceneID = control._sceneID;
                 }
                 else
                 {
-                    LogError("Error: The control is not a button. You can only trigger a cooldown on a button.");
+                    _LogError("Error: The control is not a button. You can only trigger a cooldown on a button.");
                     return;
                 }
             }
@@ -1107,7 +1116,7 @@ namespace Microsoft.Mixer
             var controlAsButton = control as InteractiveButtonControl;
             if (controlAsButton != null)
             {
-                controlAsButton.cooldownExpirationTime = computedCooldown;
+                controlAsButton._cooldownExpirationTime = computedCooldown;
             }
 
             // Send an update control message
@@ -1273,6 +1282,18 @@ namespace Microsoft.Mixer
                             OnInteractiveJoystickControlEvent(this, interactiveEvent as InteractiveJoystickEventArgs);
                         }
                         break;
+                    case InteractiveEventType.MouseButton:
+                        if (OnInteractiveMouseButtonEvent != null)
+                        {
+                            OnInteractiveMouseButtonEvent(this, interactiveEvent as InteractiveMouseButtonEventArgs);
+                        }
+                        break;
+                    case InteractiveEventType.Coordinates:
+                        if (OnInteractiveCoordinatesChangedEvent != null)
+                        {
+                            OnInteractiveCoordinatesChangedEvent(this, interactiveEvent as InteractiveCoordinatesChangedEventArgs);
+                        }
+                        break;
                     case InteractiveEventType.TextInput:
                         if (OnInteractiveTextControlEvent != null)
                         {
@@ -1294,6 +1315,12 @@ namespace Microsoft.Mixer
                 }
             }
             _queuedEvents.Clear();
+
+            // Raise an event for any other controls listening for DoWork.
+            if (OnInteractiveDoWorkEvent != null)
+            {
+                OnInteractiveDoWorkEvent(this, new InteractiveEventArgs());
+            }
         }
 
         public void SendQueuedSetControlPropertyUpdates()
@@ -1417,9 +1444,9 @@ namespace Microsoft.Mixer
             }
             catch
             {
-                LogError("Error: Failed to process message: " + messageText);
+                _LogError("Error: Failed to process message: " + messageText);
             }
-            Log(messageText);
+            _Log(messageText);
             _queuedEvents.Add(new InteractiveMessageEventArgs(messageText));
         }
 
@@ -1476,14 +1503,14 @@ namespace Microsoft.Mixer
                         }
                         catch (Exception ex)
                         {
-                            LogError("Error: Error while processing method: " + methodName + ". Error message: " + ex.Message);
+                            _LogError("Error: Error while processing method: " + methodName + ". Error message: " + ex.Message);
                         }
                     }
                 }
             }
             catch (Exception ex)
             {
-                LogError("Error: Error processing websocket message. Error message: " + ex.Message);
+                _LogError("Error: Error processing websocket message. Error message: " + ex.Message);
             }
         }
 
@@ -1509,7 +1536,7 @@ namespace Microsoft.Mixer
                 }
                 catch
                 {
-                    LogError("Error: Failed to get the message ID from the reply message.");
+                    _LogError("Error: Failed to get the message ID from the reply message.");
                 }
             }
             string replyMessgeMethod = string.Empty;
@@ -1537,7 +1564,7 @@ namespace Microsoft.Mixer
             }
             catch
             {
-                LogError("Error: An error occured while processing the reply: " + replyMessgeMethod);
+                _LogError("Error: An error occured while processing the reply: " + replyMessgeMethod);
             }
         }
 
@@ -1579,7 +1606,7 @@ namespace Microsoft.Mixer
             if (errorCode != 0 &&
                 errorMessage != string.Empty)
             {
-                LogError(errorMessage, errorCode);
+                _LogError(errorMessage, errorCode);
             }
         }
 
@@ -1695,7 +1722,7 @@ namespace Microsoft.Mixer
             }
             catch
             {
-                LogError("Error: Failed reading controls for scene: " + sceneID + ".");
+                _LogError("Error: Failed reading controls for scene: " + sceneID + ".");
             }
         }
 
@@ -1760,7 +1787,7 @@ namespace Microsoft.Mixer
 
         private void CloneGroupValues(InteractiveGroup source, InteractiveGroup destination)
         {
-            destination.etag = source.etag;
+            destination._etag = source._etag;
             destination.SceneID = source.SceneID;
             destination.GroupID = source.GroupID;
         }
@@ -1810,7 +1837,7 @@ namespace Microsoft.Mixer
 
         private void CloneParticipantValues(InteractiveParticipant source, InteractiveParticipant destination)
         {
-            destination.sessionID = source.sessionID;
+            destination._sessionID = source._sessionID;
             destination.UserID = source.UserID;
             destination.UserName = source.UserName;
             destination.Level = source.Level;
@@ -1818,8 +1845,8 @@ namespace Microsoft.Mixer
             destination.ConnectedAt = source.ConnectedAt;
             destination.InputDisabled = source.InputDisabled;
             destination.State = source.State;
-            destination.groupID = source.groupID;
-            destination.etag = source.etag;
+            destination._groupID = source._groupID;
+            destination._etag = source._etag;
         }
 
         private InteractiveParticipant ReadParticipant(JsonReader jsonReader)
@@ -2002,6 +2029,29 @@ namespace Microsoft.Mixer
             return new InteractiveGroup(etag, sceneID, groupID);
         }
 
+        private Dictionary<string, object> ReadNestedObject(JsonReader jsonReader)
+        {
+            Dictionary<string, object> nestedObject = new Dictionary<string, object>();
+            while (jsonReader.Read())
+            {
+                if (jsonReader.Value != null)
+                {
+                    string key = jsonReader.Value.ToString();
+                    // If we encounter a start object, then we have a nested metaproperty,
+                    // if not we can assign the value directly.
+                    if (jsonReader.TokenType == JsonToken.StartObject)
+                    {
+                        nestedObject.Add(key, ReadNestedObject(jsonReader));
+                    }
+                    else
+                    {
+                        nestedObject.Add(key, jsonReader.Value);
+                    }
+                }
+            }
+            return nestedObject;
+        }
+
         private void HandleGetScenes(JsonReader jsonReader)
         {
             while (jsonReader.Read())
@@ -2064,7 +2114,7 @@ namespace Microsoft.Mixer
                                 jsonReader.ReadAsString();
                                 if (jsonReader.Value != null)
                                 {
-                                    scene.etag = jsonReader.Value.ToString();
+                                    scene._etag = jsonReader.Value.ToString();
                                 }
                                 break;
                             case WS_MESSAGE_KEY_CONTROLS:
@@ -2079,7 +2129,7 @@ namespace Microsoft.Mixer
             }
             catch
             {
-                LogError("Error: Error reading scene " + scene.SceneID + ".");
+                _LogError("Error: Error reading scene " + scene.SceneID + ".");
             }
 
             return scene;
@@ -2111,7 +2161,7 @@ namespace Microsoft.Mixer
             }
             catch
             {
-                LogError("Error: Failed reading controls for scene: " + scene.SceneID + ".");
+                _LogError("Error: Failed reading controls for scene: " + scene.SceneID + ".");
             }
         }
 
@@ -2142,7 +2192,7 @@ namespace Microsoft.Mixer
                                 jsonReader.ReadAsBoolean();
                                 disabled = (bool)jsonReader.Value;
                                 break;
-                            case WS_MESSAGE_KEY_TEXT:
+                            case _WS_MESSAGE_KEY_TEXT:
                                 jsonReader.Read();
                                 helpText = jsonReader.Value.ToString();
                                 break;
@@ -2154,7 +2204,7 @@ namespace Microsoft.Mixer
                                 jsonReader.Read();
                                 kind = jsonReader.Value.ToString();
                                 break;
-                            case WS_MESSAGE_KEY_COST:
+                            case _WS_MESSAGE_KEY_COST:
                                 jsonReader.ReadAsInt32();
                                 cost = Convert.ToUInt32(jsonReader.Value);
                                 break;
@@ -2167,7 +2217,7 @@ namespace Microsoft.Mixer
             }
             catch
             {
-                LogError("Error: Error reading control " + controlID + ".");
+                _LogError("Error: Error reading control " + controlID + ".");
             }
             if (kind == WS_MESSAGE_VALUE_CONTROL_TYPE_BUTTON)
             {
@@ -2177,7 +2227,7 @@ namespace Microsoft.Mixer
             {
                 newControl = new InteractiveJoystickControl(controlID, InteractiveEventType.Joystick, disabled, helpText, eTag, sceneID);
             }
-            else if (kind == WS_MESSAGE_VALUE_CONTROL_TYPE_TEXTBOX)
+            else if (kind == _WS_MESSAGE_VALUE_CONTROL_TYPE_TEXTBOX)
             {
                 newControl = new InteractiveTextControl(controlID, InteractiveEventType.TextInput, disabled, helpText, eTag, sceneID);
             }
@@ -2188,9 +2238,9 @@ namespace Microsoft.Mixer
             return newControl;
         }
 
-        private InputEvent ReadInputObject(JsonReader jsonReader)
+        private _InputEvent ReadInputObject(JsonReader jsonReader)
         {
-            InputEvent inputEvent = new InputEvent();
+            _InputEvent inputEvent = new _InputEvent();
             while (jsonReader.Read())
             {
                 if (jsonReader.TokenType == JsonToken.StartObject)
@@ -2201,12 +2251,11 @@ namespace Microsoft.Mixer
             return inputEvent;
         }
 
-        private InputEvent ReadInputInnerObject(JsonReader jsonReader)
+        private _InputEvent ReadInputInnerObject(JsonReader jsonReader)
         {
             int startDepth = jsonReader.Depth;
             string controlID = string.Empty;
             string eventName = string.Empty;
-            string kind = string.Empty;
             object rawValue = null;
             bool isPressed = false;
             float x = 0;
@@ -2253,10 +2302,6 @@ namespace Microsoft.Mixer
                             case WS_MESSAGE_KEY_Y:
                                 y = (float)jsonReader.ReadAsDouble();
                                 break;
-                            case WS_MESSAGE_KEY_KIND:
-                                jsonReader.Read();
-                                kind = jsonReader.Value.ToString();
-                                break;
                             case WS_MESSAGE_KEY_VALUE:
                                 jsonReader.Read();
                                 rawValue = jsonReader.Value;
@@ -2279,7 +2324,7 @@ namespace Microsoft.Mixer
             }
             catch
             {
-                LogError("Error: Error reading input from control " + controlID + ".");
+                _LogError("Error: Error reading input from control " + controlID + ".");
             }
             uint cost = 0;
             InteractiveControl control = ControlFromControlID(controlID);
@@ -2293,7 +2338,7 @@ namespace Microsoft.Mixer
             {
                 textValue = rawValue.ToString();
             }
-            return new InputEvent(controlID, control.Kind, eventName, controlType, isPressed, x, y, cost, string.Empty, textValue, rawValue);
+            return new _InputEvent(controlID, control._kind, eventName, controlType, isPressed, x, y, cost, string.Empty, textValue, rawValue);
         }
 
         private void HandleParticipantJoin(JsonReader jsonReader)
@@ -2357,7 +2402,7 @@ namespace Microsoft.Mixer
             }
             catch
             {
-                LogError("Error: Error while processing participant leave message.");
+                _LogError("Error: Error while processing participant leave message.");
             }
         }
 
@@ -2380,23 +2425,23 @@ namespace Microsoft.Mixer
                 }
             }
         }
-        internal struct InputEvent
+        internal struct _InputEvent
         {
-            internal string ControlID;
-            internal string Kind;
-            internal string Event;
+            internal string _controlID;
+            internal string _kind;
+            internal string _event;
             // Type is a legacy field. For future controls,
             // use the kind property.
-            internal InteractiveEventType Type;
-            internal uint Cost;
-            internal bool IsPressed;
-            internal string TransactionID;
-            internal float X;
-            internal float Y;
-            internal string TextValue;
-            object Value;
+            internal InteractiveEventType _type;
+            internal uint _cost;
+            internal bool _isPressed;
+            internal string _transactionID;
+            internal float _x;
+            internal float _y;
+            internal string _textValue;
+            object _value;
 
-            internal InputEvent(
+            internal _InputEvent(
                 string controlID,
                 string kind,
                 string eventName,
@@ -2410,17 +2455,17 @@ namespace Microsoft.Mixer
                 object value
                 )
             {
-                ControlID = controlID;
-                Kind = kind;
-                Event = eventName;
-                Type = type;
-                Cost = cost;
-                TransactionID = transactionID;
-                IsPressed = isPressed;
-                X = x;
-                Y = y;
-                TextValue = textValue;
-                Value = value;
+                _controlID = controlID;
+                _kind = kind;
+                _event = eventName;
+                _type = type;
+                _cost = cost;
+                _transactionID = transactionID;
+                _isPressed = isPressed;
+                _x = x;
+                _y = y;
+                _textValue = textValue;
+                _value = value;
             }
         };
 
@@ -2428,7 +2473,7 @@ namespace Microsoft.Mixer
         {
             string participantSessionID = string.Empty;
             string transactionID = string.Empty;
-            InputEvent inputEvent = new InputEvent();
+            _InputEvent inputEvent = new _InputEvent();
 
             while (jsonReader.Read())
             {
@@ -2455,45 +2500,83 @@ namespace Microsoft.Mixer
                 }
             }
 
-            inputEvent.TransactionID = transactionID;
+            inputEvent._transactionID = transactionID;
             InternalTransactionIDState newTransactionIDState = new InternalTransactionIDState();
-            if (_transactionIDsState.ContainsKey(inputEvent.ControlID))
+            if (_transactionIDsState.ContainsKey(inputEvent._controlID))
             {
-                newTransactionIDState = _transactionIDsState[inputEvent.ControlID];
+                newTransactionIDState = _transactionIDsState[inputEvent._controlID];
             }
             newTransactionIDState.nextTransactionID = transactionID;
-            _transactionIDsState[inputEvent.ControlID] = newTransactionIDState;
+            _transactionIDsState[inputEvent._controlID] = newTransactionIDState;
 
             InteractiveParticipant participant = ParticipantBySessionId(participantSessionID);
-            if (!_participantsWhoTriggeredGiveInput.ContainsKey(inputEvent.ControlID))
+            if (!_participantsWhoTriggeredGiveInput.ContainsKey(inputEvent._controlID))
             {
-                _participantsWhoTriggeredGiveInput.Add(inputEvent.ControlID, new InternalParticipantTrackingState(participant));
+                _participantsWhoTriggeredGiveInput.Add(inputEvent._controlID, new _InternalParticipantTrackingState(participant));
             }
             participant.LastInputAt = DateTime.UtcNow;
-            if (inputEvent.Type == InteractiveEventType.Button)
+            if (inputEvent._type == InteractiveEventType.Button)
             {
-                InteractiveButtonEventArgs eventArgs = new InteractiveButtonEventArgs(inputEvent.Type, inputEvent.ControlID, participant, inputEvent.IsPressed, inputEvent.Cost, inputEvent.TransactionID);
+                InteractiveButtonEventArgs eventArgs = new InteractiveButtonEventArgs(inputEvent._type, inputEvent._controlID, participant, inputEvent._isPressed, inputEvent._cost, inputEvent._transactionID);
                 _queuedEvents.Add(eventArgs);
                 UpdateInternalButtonState(eventArgs);
             }
-            else if (inputEvent.Type == InteractiveEventType.Joystick)
+            else if (inputEvent._type == InteractiveEventType.Joystick)
             {
-                InteractiveJoystickEventArgs eventArgs = new InteractiveJoystickEventArgs(inputEvent.Type, inputEvent.ControlID, participant, inputEvent.X, inputEvent.Y);
+                InteractiveJoystickEventArgs eventArgs = new InteractiveJoystickEventArgs(inputEvent._type, inputEvent._controlID, participant, inputEvent._x, inputEvent._y);
                 _queuedEvents.Add(eventArgs);
                 UpdateInternalJoystickState(eventArgs);
             }
-            else if (inputEvent.Type == InteractiveEventType.TextInput)
+            else if (inputEvent._type == InteractiveEventType.TextInput)
             {
-                InteractiveTextEventArgs textEventArgs = new InteractiveTextEventArgs(inputEvent.Type, inputEvent.ControlID, participant, inputEvent.TextValue, inputEvent.TransactionID);
+                InteractiveTextEventArgs textEventArgs = new InteractiveTextEventArgs(inputEvent._type, inputEvent._controlID, participant, inputEvent._textValue, inputEvent._transactionID);
                 _queuedEvents.Add(textEventArgs);
                 UpdateInternalTextBoxState(textEventArgs);
             }
 
             uint participantID = participant.UserID;
 
+            // Handle screen input
+            if (inputEvent._kind == _CONTROL_KIND_SCREEN)
+            {
+                // Update x, y coordinates
+                if (inputEvent._event == EVENT_NAME_MOVE)
+                {
+                    Vector2 newMousePosition = new Vector2(inputEvent._x, inputEvent._y);
+                    // Translate the position to screen space.
+                    newMousePosition.x *= Screen.width;
+                    newMousePosition.y *= Screen.height;
+                    if (_mousePositionsByParticipant.ContainsKey(participantID))
+                    {
+                        _mousePositionsByParticipant[participantID] = newMousePosition;
+                    }
+                    else
+                    {
+                        _mousePositionsByParticipant.Add(participantID, newMousePosition);
+                    }
+                    InteractiveCoordinatesChangedEventArgs mouseMoveEventArgs = new InteractiveCoordinatesChangedEventArgs(
+                       inputEvent._controlID,
+                       participant,
+                       newMousePosition
+                       );
+                    _queuedEvents.Add(mouseMoveEventArgs);
+                }
+                else if (inputEvent._event == EVENT_NAME_MOUSE_DOWN ||
+                    inputEvent._event == EVENT_NAME_MOUSE_UP)
+                {
+                    InteractiveMouseButtonEventArgs mouseButtonEventArgs = new InteractiveMouseButtonEventArgs(
+                       inputEvent._controlID,
+                       participant,
+                       inputEvent._isPressed
+                       );
+                    _queuedEvents.Add(mouseButtonEventArgs);
+                    UpdateInternalMouseButtonState(mouseButtonEventArgs);
+                }
+            }
+
             // Put the input key values in the control data structure.
-            string controlID = inputEvent.ControlID;
-            string controlType = inputEvent.Kind;
+            string controlID = inputEvent._controlID;
+            string controlType = inputEvent._kind;
             Dictionary<string, object> controlData = new Dictionary<string, object>();
             if (_giveInputControlData.TryGetValue(controlID, out controlData))
             {
@@ -2549,7 +2632,7 @@ namespace Microsoft.Mixer
             var existingParticipants = Participants;
             foreach (InteractiveParticipant participant in existingParticipants)
             {
-                if (participant.sessionID == sessionID)
+                if (participant._sessionID == sessionID)
                 {
                     target = participant;
                     break;
@@ -2558,7 +2641,7 @@ namespace Microsoft.Mixer
             return target;
         }
 
-        internal InteractiveParticipant ParticipantByUserId(uint userID)
+        internal InteractiveParticipant _ParticipantByUserId(uint userID)
         {
             InteractiveParticipant target = null;
             var existingParticipants = Participants;
@@ -2573,16 +2656,16 @@ namespace Microsoft.Mixer
             return target;
         }
 
-        internal bool GetButtonDown(string controlID, uint userID)
+        internal bool _GetButtonDown(string controlID, uint userID)
         {
             bool getButtonDownResult = false;
             bool participantExists = false;
-            Dictionary<string, InternalButtonState> participantControls;
+            Dictionary<string, _InternalButtonState> participantControls;
             participantExists = _buttonStatesByParticipant.TryGetValue(userID, out participantControls);
             if (participantExists)
             {
                 bool controlExists = false;
-                InternalButtonState buttonState;
+                _InternalButtonState buttonState;
                 controlExists = participantControls.TryGetValue(controlID, out buttonState);
                 if (controlExists)
                 {
@@ -2596,16 +2679,16 @@ namespace Microsoft.Mixer
             return getButtonDownResult;
         }
 
-        internal bool GetButtonPressed(string controlID, uint userID)
+        internal bool _GetButtonPressed(string controlID, uint userID)
         {
             bool getButtonResult = false;
             bool participantExists = false;
-            Dictionary<string, InternalButtonState> participantControls;
+            Dictionary<string, _InternalButtonState> participantControls;
             participantExists = _buttonStatesByParticipant.TryGetValue(userID, out participantControls);
             if (participantExists)
             {
                 bool controlExists = false;
-                InternalButtonState buttonState;
+                _InternalButtonState buttonState;
                 controlExists = participantControls.TryGetValue(controlID, out buttonState);
                 if (controlExists)
                 {
@@ -2619,16 +2702,16 @@ namespace Microsoft.Mixer
             return getButtonResult;
         }
 
-        internal bool GetButtonUp(string controlID, uint userID)
+        internal bool _GetButtonUp(string controlID, uint userID)
         {
             bool getButtonUpResult = false;
             bool participantExists = false;
-            Dictionary<string, InternalButtonState> participantControls;
+            Dictionary<string, _InternalButtonState> participantControls;
             participantExists = _buttonStatesByParticipant.TryGetValue(userID, out participantControls);
             if (participantExists)
             {
                 bool controlExists = false;
-                InternalButtonState buttonState;
+                _InternalButtonState buttonState;
                 controlExists = participantControls.TryGetValue(controlID, out buttonState);
                 if (controlExists)
                 {
@@ -2642,16 +2725,16 @@ namespace Microsoft.Mixer
             return getButtonUpResult;
         }
 
-        internal uint GetCountOfButtonDowns(string controlID, uint userID)
+        internal uint _GetCountOfButtonDowns(string controlID, uint userID)
         {
             uint countOfButtonDownEvents = 0;
             bool participantExists = false;
-            Dictionary<string, InternalButtonState> participantControls;
+            Dictionary<string, _InternalButtonState> participantControls;
             participantExists = _buttonStatesByParticipant.TryGetValue(userID, out participantControls);
             if (participantExists)
             {
                 bool controlExists = false;
-                InternalButtonState buttonState;
+                _InternalButtonState buttonState;
                 controlExists = participantControls.TryGetValue(controlID, out buttonState);
                 if (controlExists)
                 {
@@ -2661,16 +2744,16 @@ namespace Microsoft.Mixer
             return countOfButtonDownEvents;
         }
 
-        internal uint GetCountOfButtonPresses(string controlID, uint userID)
+        internal uint _GetCountOfButtonPresses(string controlID, uint userID)
         {
             uint countOfButtonPressEvents = 0;
             bool participantExists = false;
-            Dictionary<string, InternalButtonState> participantControls;
+            Dictionary<string, _InternalButtonState> participantControls;
             participantExists = _buttonStatesByParticipant.TryGetValue(userID, out participantControls);
             if (participantExists)
             {
                 bool controlExists = false;
-                InternalButtonState buttonState;
+                _InternalButtonState buttonState;
                 controlExists = participantControls.TryGetValue(controlID, out buttonState);
                 if (controlExists)
                 {
@@ -2680,12 +2763,12 @@ namespace Microsoft.Mixer
             return countOfButtonPressEvents;
         }
 
-        internal uint GetCountOfButtonUps(string controlID, uint userID)
+        internal uint _GetCountOfButtonUps(string controlID, uint userID)
         {
             uint countOfButtonUpEvents = 0;
-            InternalButtonState buttonState;
+            _InternalButtonState buttonState;
             bool participantExists = false;
-            Dictionary<string, InternalButtonState> participantControls;
+            Dictionary<string, _InternalButtonState> participantControls;
             participantExists = _buttonStatesByParticipant.TryGetValue(userID, out participantControls);
             if (participantExists)
             {
@@ -2699,12 +2782,12 @@ namespace Microsoft.Mixer
             return countOfButtonUpEvents;
         }
 
-        internal bool TryGetButtonStateByParticipant(uint userID, string controlID, out InternalButtonState buttonState)
+        internal bool _TryGetButtonStateByParticipant(uint userID, string controlID, out _InternalButtonState buttonState)
         {
-            buttonState = new InternalButtonState();
+            buttonState = new _InternalButtonState();
             bool buttonExists = false;
             bool participantExists = false;
-            Dictionary<string, InternalButtonState> participantControls;
+            Dictionary<string, _InternalButtonState> participantControls;
             participantExists = _buttonStatesByParticipant.TryGetValue(userID, out participantControls);
             if (participantExists)
             {
@@ -2718,7 +2801,7 @@ namespace Microsoft.Mixer
             return buttonExists;
         }
 
-        internal InteractiveJoystickControl GetJoystick(string controlID, uint userID)
+        internal InteractiveJoystickControl _GetJoystick(string controlID, uint userID)
         {
             InteractiveJoystickControl joystick = new InteractiveJoystickControl(controlID, InteractiveEventType.Joystick, true, string.Empty, string.Empty, string.Empty);
             var joysticks = Joysticks;
@@ -2729,14 +2812,14 @@ namespace Microsoft.Mixer
                     joystick = potential;
                 }
             }
-            joystick.UserID = userID;
+            joystick._userID = userID;
             return joystick;
         }
 
-        internal double GetJoystickX(string controlID, uint userID)
+        internal double _GetJoystickX(string controlID, uint userID)
         {
             double joystickX = 0;
-            InternalJoystickState joystickState;
+            _InternalJoystickState joystickState;
             if (TryGetJoystickStateByParticipant(userID, controlID, out joystickState))
             {
                 joystickX = joystickState.X;
@@ -2744,10 +2827,10 @@ namespace Microsoft.Mixer
             return joystickX;
         }
 
-        internal double GetJoystickY(string controlID, uint userID)
+        internal double _GetJoystickY(string controlID, uint userID)
         {
             double joystickY = 0;
-            InternalJoystickState joystickState;
+            _InternalJoystickState joystickState;
             if (TryGetJoystickStateByParticipant(userID, controlID, out joystickState))
             {
                 joystickY = joystickState.Y;
@@ -2755,12 +2838,12 @@ namespace Microsoft.Mixer
             return joystickY;
         }
 
-        private bool TryGetJoystickStateByParticipant(uint userID, string controlID, out InternalJoystickState joystickState)
+        private bool TryGetJoystickStateByParticipant(uint userID, string controlID, out _InternalJoystickState joystickState)
         {
-            joystickState = new InternalJoystickState();
+            joystickState = new _InternalJoystickState();
             bool joystickExists = false;
             bool participantExists = false;
-            Dictionary<string, InternalJoystickState> participantControls;
+            Dictionary<string, _InternalJoystickState> participantControls;
             participantExists = _joystickStatesByParticipant.TryGetValue(userID, out participantControls);
             if (participantExists)
             {
@@ -2772,6 +2855,13 @@ namespace Microsoft.Mixer
                 }
             }
             return joystickExists;
+        }
+
+        internal _InternalMouseButtonState TryGetMouseButtonState(uint userID)
+        {
+            _InternalMouseButtonState mouseButtonState = new _InternalMouseButtonState();
+            _mouseButtonStateByParticipant.TryGetValue(userID, out mouseButtonState);
+            return mouseButtonState;
         }
 
         internal string GetText(string controlID, uint userID)
@@ -2786,7 +2876,7 @@ namespace Microsoft.Mixer
             return text;
         }
 
-        internal InteractiveControl GetControl(string controlID)
+        internal InteractiveControl _GetControl(string controlID)
         {
             InteractiveControl control = new InteractiveControl(controlID, "", InteractiveEventType.Unknown, true, "", "", "");
             var controls = Controls;
@@ -2847,7 +2937,7 @@ namespace Microsoft.Mixer
         /// <returns></returns>
         public string GetCurrentScene()
         {
-            InteractiveGroup group = GroupFromID(WS_MESSAGE_VALUE_DEFAULT_GROUP_ID);
+            InteractiveGroup group = GroupFromID(_WS_MESSAGE_VALUE_DEFAULT_GROUP_ID);
             return group.SceneID;
         }
 
@@ -2857,14 +2947,14 @@ namespace Microsoft.Mixer
         /// <param name="sceneID">The ID of the scene to change to.</param>
         public void SetCurrentScene(string sceneID)
         {
-            InteractiveGroup defaultGroup = GroupFromID(WS_MESSAGE_VALUE_DEFAULT_GROUP_ID);
+            InteractiveGroup defaultGroup = GroupFromID(_WS_MESSAGE_VALUE_DEFAULT_GROUP_ID);
             if (defaultGroup != null)
             {
                 defaultGroup.SetScene(sceneID);
             }
         }
 
-        internal IList<InteractiveTextResult> GetText(string controlID)
+        internal IList<InteractiveTextResult> _GetText(string controlID)
         {
             List<InteractiveTextResult> interactiveTextResults = new List<InteractiveTextResult>();
             InteractivityManager interactivityManager = InteractivityManager.SingletonInstance;
@@ -2876,21 +2966,21 @@ namespace Microsoft.Mixer
                 string text = string.Empty;
                 textboxValues.TryGetValue(controlID, out text);
                 var newTextResult = new InteractiveTextResult();
-                newTextResult.Participant = interactivityManager.ParticipantByUserId(participantUserId);
+                newTextResult.Participant = interactivityManager._ParticipantByUserId(participantUserId);
                 newTextResult.Text = text;
                 interactiveTextResults.Add(newTextResult);
             }
             return interactiveTextResults;
         }
 
-        internal void SetCurrentSceneInternal(InteractiveGroup group, string sceneID)
+        internal void _SetCurrentSceneInternal(InteractiveGroup group, string sceneID)
         {
-            SendSetUpdateGroupsMessage(group.GroupID, sceneID, group.etag);
+            _SendSetUpdateGroupsMessage(group.GroupID, sceneID, group._etag);
         }
 
         private InteractiveGroup GroupFromID(string groupID)
         {
-            InteractiveGroup target = new InteractiveGroup("", groupID, WS_MESSAGE_VALUE_DEFAULT_GROUP_ID);
+            InteractiveGroup target = new InteractiveGroup("", groupID, _WS_MESSAGE_VALUE_DEFAULT_GROUP_ID);
             var groups = Groups;
             foreach (InteractiveGroup group in groups)
             {
@@ -2925,7 +3015,7 @@ namespace Microsoft.Mixer
             {
                 if (controlID == control.ControlID)
                 {
-                    type = control.Type;
+                    type = control._type;
                     break;
                 }
             }
@@ -2958,7 +3048,7 @@ namespace Microsoft.Mixer
             _outstandingMessages.Add(messageID, WS_MESSAGE_METHOD_READY);
         }
 
-        internal void SendCaptureTransactionMessage(string transactionID)
+        internal void _SendCaptureTransactionMessage(string transactionID)
         {
             var messageID = _currentmessageID++;
             StringBuilder stringBuilder = new StringBuilder();
@@ -2983,7 +3073,7 @@ namespace Microsoft.Mixer
             _outstandingMessages.Add(messageID, WS_MESSAGE_METHOD_SET_CAPTURE_TRANSACTION);
         }
 
-        internal void SendCreateGroupsMessage(string groupID, string sceneID)
+        internal void _SendCreateGroupsMessage(string groupID, string sceneID)
         {
             var messageID = _currentmessageID++;
             StringBuilder stringBuilder = new StringBuilder();
@@ -3015,7 +3105,7 @@ namespace Microsoft.Mixer
             _outstandingMessages.Add(messageID, WS_MESSAGE_METHOD_SET_CURRENT_SCENE);
         }
 
-        internal void SendSetUpdateGroupsMessage(string groupID, string sceneID, string groupEtag)
+        internal void _SendSetUpdateGroupsMessage(string groupID, string sceneID, string groupEtag)
         {
             var messageID = _currentmessageID++;
             StringBuilder stringBuilder = new StringBuilder();
@@ -3049,7 +3139,7 @@ namespace Microsoft.Mixer
             _outstandingMessages.Add(messageID, WS_MESSAGE_METHOD_SET_CURRENT_SCENE);
         }
 
-        internal void SendSetUpdateScenesMessage(InteractiveScene scene)
+        internal void _SendSetUpdateScenesMessage(InteractiveScene scene)
         {
             var messageID = _currentmessageID++;
             StringBuilder stringBuilder = new StringBuilder();
@@ -3071,7 +3161,7 @@ namespace Microsoft.Mixer
                 jsonWriter.WritePropertyName(WS_MESSAGE_KEY_SCENE_ID);
                 jsonWriter.WriteValue(scene.SceneID);
                 jsonWriter.WritePropertyName(WS_MESSAGE_KEY_ETAG);
-                jsonWriter.WriteValue(scene.etag);
+                jsonWriter.WriteValue(scene._etag);
                 jsonWriter.WriteEndObject();
                 jsonWriter.WriteEndArray();
                 jsonWriter.WriteEndObject();
@@ -3081,7 +3171,7 @@ namespace Microsoft.Mixer
             _outstandingMessages.Add(messageID, WS_MESSAGE_METHOD_SET_CURRENT_SCENE);
         }
 
-        internal void SendUpdateParticipantsMessage(InteractiveParticipant participant)
+        internal void _SendUpdateParticipantsMessage(InteractiveParticipant participant)
         {
             var messageID = _currentmessageID++;
             StringBuilder stringBuilder = new StringBuilder();
@@ -3101,11 +3191,11 @@ namespace Microsoft.Mixer
                 jsonWriter.WriteStartArray();
                 jsonWriter.WriteStartObject();
                 jsonWriter.WritePropertyName(WS_MESSAGE_KEY_SESSION_ID);
-                jsonWriter.WriteValue(participant.sessionID);
+                jsonWriter.WriteValue(participant._sessionID);
                 jsonWriter.WritePropertyName(WS_MESSAGE_KEY_ETAG);
-                jsonWriter.WriteValue(participant.etag);
+                jsonWriter.WriteValue(participant._etag);
                 jsonWriter.WritePropertyName(WS_MESSAGE_KEY_GROUP_ID);
-                jsonWriter.WriteValue(participant.groupID);
+                jsonWriter.WriteValue(participant._groupID);
                 jsonWriter.WriteEndObject();
                 jsonWriter.WriteEndArray();
                 jsonWriter.WriteEndObject();
@@ -3142,7 +3232,7 @@ namespace Microsoft.Mixer
             _outstandingMessages.Add(messageID, WS_MESSAGE_METHOD_SET_COMPRESSION);
         }
 
-        internal void SendSetJoystickSetCoordinates(string controlID, double x, double y)
+        internal void _SendSetJoystickSetCoordinates(string controlID, double x, double y)
         {
             InteractiveControl control = ControlFromControlID(controlID);
             if (control == null)
@@ -3164,14 +3254,14 @@ namespace Microsoft.Mixer
                 jsonWriter.WritePropertyName(WS_MESSAGE_KEY_PARAMETERS);
                 jsonWriter.WriteStartObject();
                 jsonWriter.WritePropertyName(WS_MESSAGE_KEY_SCENE_ID);
-                jsonWriter.WriteValue(control.SceneID);
+                jsonWriter.WriteValue(control._sceneID);
                 jsonWriter.WritePropertyName(WS_MESSAGE_KEY_CONTROLS);
                 jsonWriter.WriteStartArray();
                 jsonWriter.WriteStartObject();
                 jsonWriter.WritePropertyName(WS_MESSAGE_KEY_CONTROL_ID);
                 jsonWriter.WriteValue(controlID);
                 jsonWriter.WritePropertyName(WS_MESSAGE_KEY_ETAG);
-                jsonWriter.WriteValue(control.ETag);
+                jsonWriter.WriteValue(control._eTag);
                 jsonWriter.WritePropertyName(WS_MESSAGE_KEY_X);
                 jsonWriter.WriteValue(x);
                 jsonWriter.WritePropertyName(WS_MESSAGE_KEY_Y);
@@ -3185,7 +3275,7 @@ namespace Microsoft.Mixer
             _outstandingMessages.Add(messageID, WS_MESSAGE_METHOD_SET_JOYSTICK_COORDINATES);
         }
 
-        internal void SendSetButtonControlProperties(
+        internal void _SendSetButtonControlProperties(
             string controlID,
             string propertyName,
             bool disabled,
@@ -3214,32 +3304,32 @@ namespace Microsoft.Mixer
                 jsonWriter.WritePropertyName(WS_MESSAGE_KEY_PARAMETERS);
                 jsonWriter.WriteStartObject();
                 jsonWriter.WritePropertyName(WS_MESSAGE_KEY_SCENE_ID);
-                jsonWriter.WriteValue(control.SceneID);
+                jsonWriter.WriteValue(control._sceneID);
                 jsonWriter.WritePropertyName(WS_MESSAGE_KEY_CONTROLS);
                 jsonWriter.WriteStartArray();
                 jsonWriter.WriteStartObject();
                 jsonWriter.WritePropertyName(WS_MESSAGE_KEY_CONTROL_ID);
                 jsonWriter.WriteValue(controlID);
                 jsonWriter.WritePropertyName(WS_MESSAGE_KEY_ETAG);
-                jsonWriter.WriteValue(control.ETag);
-                if (propertyName == WS_MESSAGE_VALUE_DISABLED)
+                jsonWriter.WriteValue(control._eTag);
+                if (propertyName == _WS_MESSAGE_VALUE_DISABLED)
                 {
-                    jsonWriter.WritePropertyName(WS_MESSAGE_VALUE_DISABLED);
+                    jsonWriter.WritePropertyName(_WS_MESSAGE_VALUE_DISABLED);
                     jsonWriter.WriteValue(disabled);
                 }
-                if (propertyName == WS_MESSAGE_KEY_PROGRESS)
+                if (propertyName == _WS_MESSAGE_KEY_PROGRESS)
                 {
-                    jsonWriter.WritePropertyName(WS_MESSAGE_KEY_PROGRESS);
+                    jsonWriter.WritePropertyName(_WS_MESSAGE_KEY_PROGRESS);
                     jsonWriter.WriteValue(progress);
                 }
-                if (propertyName == WS_MESSAGE_KEY_TEXT)
+                if (propertyName == _WS_MESSAGE_KEY_TEXT)
                 {
-                    jsonWriter.WritePropertyName(WS_MESSAGE_KEY_TEXT);
+                    jsonWriter.WritePropertyName(_WS_MESSAGE_KEY_TEXT);
                     jsonWriter.WriteValue(text);
                 }
-                if (propertyName == WS_MESSAGE_KEY_COST)
+                if (propertyName == _WS_MESSAGE_KEY_COST)
                 {
-                    jsonWriter.WritePropertyName(WS_MESSAGE_KEY_COST);
+                    jsonWriter.WritePropertyName(_WS_MESSAGE_KEY_COST);
                     jsonWriter.WriteValue(cost);
                 }
                 jsonWriter.WriteEndObject();
@@ -3292,7 +3382,7 @@ namespace Microsoft.Mixer
                 catch (Exception e)
                 {
                     var foo = e.Message;
-                    LogError("Error: Unable to send message: " + method);
+                    _LogError("Error: Unable to send message: " + method);
                 }
             }
             _outstandingMessages.Add(messageID, method);
@@ -3314,7 +3404,7 @@ namespace Microsoft.Mixer
 #else
             _websocket.Send(jsonString);
 #endif
-            Log(jsonString);
+            _Log(jsonString);
         }
 
         List<InteractiveEventArgs> _queuedEvents = new List<InteractiveEventArgs>();
@@ -3375,7 +3465,7 @@ namespace Microsoft.Mixer
         private const string WS_MESSAGE_KEY_CONNECTED_AT = "connectedAt";
         private const string WS_MESSAGE_KEY_CONTROLS = "controls";
         private const string WS_MESSAGE_KEY_CONTROL_ID = "controlID";
-        internal const string WS_MESSAGE_KEY_COST = "cost";
+        internal const string _WS_MESSAGE_KEY_COST = "cost";
         private const string WS_MESSAGE_KEY_DISABLED = "disabled";
         private const string WS_MESSAGE_KEY_ERROR_CODE = "code";
         private const string WS_MESSAGE_KEY_ERROR_MESSAGE = "message";
@@ -3400,14 +3490,14 @@ namespace Microsoft.Mixer
         private const string WS_MESSAGE_KEY_PARTICIPANT_ID = "participantID";
         private const string WS_MESSAGE_KEY_PARTICIPANTS = "participants";
         private const string WS_MESSAGE_KEY_PARAMETERS = "params";
-        internal const string WS_MESSAGE_KEY_PROGRESS = "progress";
+        internal const string _WS_MESSAGE_KEY_PROGRESS = "progress";
         private const string WS_MESSAGE_KEY_PROJECT_VERSION_ID = "projectversionid";
         private const string WS_MESSAGE_KEY_SCENE_ID = "sceneID";
         private const string WS_MESSAGE_KEY_SCENES = "scenes";
         private const string WS_MESSAGE_KEY_SCHEME = "scheme";
         private const string WS_MESSAGE_KEY_SESSION_ID = "sessionID";
         private const string WS_MESSAGE_KEY_PROJECT_SHARE_CODE = "sharecode";
-        internal const string WS_MESSAGE_KEY_TEXT = "text";
+        internal const string _WS_MESSAGE_KEY_TEXT = "text";
         private const string WS_MESSAGE_KEY_TRANSACTION_ID = "transactionID";
         private const string WS_MESSAGE_KEY_TYPE = "type";
         private const string WS_MESSAGE_KEY_USER_ID = "userID";
@@ -3420,11 +3510,11 @@ namespace Microsoft.Mixer
 
         // Values
         private const string WS_MESSAGE_VALUE_CONTROL_TYPE_BUTTON = "button";
-        internal const string WS_MESSAGE_VALUE_DISABLED = "disabled";
-        internal const string WS_MESSAGE_VALUE_DEFAULT_GROUP_ID = "default";
-        internal const string WS_MESSAGE_VALUE_DEFAULT_SCENE_ID = "default";
+        internal const string _WS_MESSAGE_VALUE_DISABLED = "disabled";
+        internal const string _WS_MESSAGE_VALUE_DEFAULT_GROUP_ID = "default";
+        internal const string _WS_MESSAGE_VALUE_DEFAULT_SCENE_ID = "default";
         private const string WS_MESSAGE_VALUE_CONTROL_TYPE_JOYSTICK = "joystick";
-        internal const string WS_MESSAGE_VALUE_CONTROL_TYPE_TEXTBOX = "textbox";
+        internal const string _WS_MESSAGE_VALUE_CONTROL_TYPE_TEXTBOX = "textbox";
         private const bool WS_MESSAGE_VALUE_TRUE = true;
 
         // Message types
@@ -3465,9 +3555,10 @@ namespace Microsoft.Mixer
         private const string WS_MESSAGE_ERROR = "error";
 
         // Input
-        internal const string CONTROL_TYPE_BUTTON = "button";
-        internal const string CONTROL_TYPE_JOYSTICK = "joystick";
-        internal const string CONTROL_KIND_TEXTBOX = "textbox";
+        internal const string _CONTROL_TYPE_BUTTON = "button";
+        internal const string _CONTROL_TYPE_JOYSTICK = "joystick";
+        internal const string _CONTROL_KIND_TEXTBOX = "textbox";
+        internal const string _CONTROL_KIND_SCREEN = "screen";
 
         // Event names
         private const string EVENT_NAME_MOUSE_DOWN = "mousedown";
@@ -3489,17 +3580,19 @@ namespace Microsoft.Mixer
         private const string PROTOCOL_VERSION = "2.0";
 
         // Control-specific data structures
-        internal static Dictionary<string, InternalButtonCountState> _buttonStates;
-        internal static Dictionary<uint, Dictionary<string, InternalButtonState>> _buttonStatesByParticipant;
-        internal static Dictionary<string, InternalJoystickState> _joystickStates;
-        internal static Dictionary<uint, Dictionary<string, InternalJoystickState>> _joystickStatesByParticipant;
+        internal static Dictionary<string, _InternalButtonCountState> _buttonStates;
+        internal static Dictionary<uint, Dictionary<string, _InternalButtonState>> _buttonStatesByParticipant;
+        internal static Dictionary<string, _InternalJoystickState> _joystickStates;
+        internal static Dictionary<uint, Dictionary<string, _InternalJoystickState>> _joystickStatesByParticipant;
         internal static Dictionary<uint, Dictionary<string, string>> _textboxValuesByParticipant;
+        internal static Dictionary<uint, _InternalMouseButtonState> _mouseButtonStateByParticipant;
+        internal static Dictionary<uint, Vector2> _mousePositionsByParticipant;
 
         // Generic data structures for storing any control data
         internal static Dictionary<string, Dictionary<uint, Dictionary<string, object>>> _giveInputControlDataByParticipant;
         internal static Dictionary<string, Dictionary<string, object>> _giveInputControlData;
         internal static Dictionary<string, object> _giveInputKeyValues;
-        internal static Dictionary<string, InternalParticipantTrackingState> _participantsWhoTriggeredGiveInput;
+        internal static Dictionary<string, _InternalParticipantTrackingState> _participantsWhoTriggeredGiveInput;
         private static Dictionary<string, Dictionary<string, InternalControlPropertyUpdateData>> _queuedControlPropertyUpdates;
         internal static Dictionary<string, InternalTransactionIDState> _transactionIDsState;
 
@@ -3527,8 +3620,8 @@ namespace Microsoft.Mixer
             _scenes = new List<InteractiveScene>();
             _websocketHosts = new List<string>();
 
-            _buttonStates = new Dictionary<string, InternalButtonCountState>();
-            _buttonStatesByParticipant = new Dictionary<uint, Dictionary<string, InternalButtonState>>();
+            _buttonStates = new Dictionary<string, _InternalButtonCountState>();
+            _buttonStatesByParticipant = new Dictionary<uint, Dictionary<string, _InternalButtonState>>();
 
             if (Application.isEditor)
             {
@@ -3539,10 +3632,12 @@ namespace Microsoft.Mixer
                 LoggingLevel = LoggingLevel.None;
             }
 
-            _joystickStates = new Dictionary<string, InternalJoystickState>();
-            _joystickStatesByParticipant = new Dictionary<uint, Dictionary<string, InternalJoystickState>>();
+            _joystickStates = new Dictionary<string, _InternalJoystickState>();
+            _joystickStatesByParticipant = new Dictionary<uint, Dictionary<string, _InternalJoystickState>>();
+            _mouseButtonStateByParticipant = new Dictionary<uint, _InternalMouseButtonState>();
+            _mousePositionsByParticipant = new Dictionary<uint, Vector2>();
 
-            _participantsWhoTriggeredGiveInput = new Dictionary<string, InternalParticipantTrackingState>();
+            _participantsWhoTriggeredGiveInput = new Dictionary<string, _InternalParticipantTrackingState>();
             _queuedControlPropertyUpdates = new Dictionary<string, Dictionary<string, InternalControlPropertyUpdateData>>();
             _transactionIDsState = new Dictionary<string, InternalTransactionIDState>();
 
@@ -3560,7 +3655,7 @@ namespace Microsoft.Mixer
             _messageWriter = new DataWriter(_websocket.OutputStream);
 #endif
 
-            mixerInteractiveHelper = MixerInteractiveHelper.SingletonInstance;
+            mixerInteractiveHelper = MixerInteractiveHelper._SingletonInstance;
         }
 
         private void OnInternalRefreshShortCodeTimerCallback(object sender, MixerInteractiveHelper.InternalTimerCallbackEventArgs e)
@@ -3575,18 +3670,18 @@ namespace Microsoft.Mixer
             VerifyAuthToken();
         }
 
-        internal void LogError(string message)
+        internal void _LogError(string message)
         {
-            LogError(message, ERROR_FAIL);
+            _LogError(message, ERROR_FAIL);
         }
 
-        internal void LogError(string message, int code)
+        internal void _LogError(string message, int code)
         {
             _queuedEvents.Add(new InteractiveEventArgs(InteractiveEventType.Error, code, message));
-            Log(message, LoggingLevel.Minimal);
+            _Log(message, LoggingLevel.Minimal);
         }
 
-        internal void Log(string message, LoggingLevel level = LoggingLevel.Verbose)
+        internal void _Log(string message, LoggingLevel level = LoggingLevel.Verbose)
         {
             if (LoggingLevel == LoggingLevel.None ||
                 (LoggingLevel == LoggingLevel.Minimal && level == LoggingLevel.Verbose))
@@ -3606,8 +3701,8 @@ namespace Microsoft.Mixer
             List<string> _buttonStatesKeys = new List<string>(_buttonStates.Keys);
             foreach (string key in _buttonStatesKeys)
             {
-                InternalButtonCountState oldButtonState = _buttonStates[key];
-                InternalButtonCountState newButtonState = new InternalButtonCountState();
+                _InternalButtonCountState oldButtonState = _buttonStates[key];
+                _InternalButtonCountState newButtonState = new _InternalButtonCountState();
                 newButtonState.PreviousCountOfButtonDownEvents = oldButtonState.CountOfButtonDownEvents;
                 newButtonState.CountOfButtonDownEvents = oldButtonState.NextCountOfButtonDownEvents;
                 newButtonState.NextCountOfButtonDownEvents = 0;
@@ -3633,9 +3728,9 @@ namespace Microsoft.Mixer
                 List<string> _buttonStatesByParticipantButtonStateKeys = new List<string>(_buttonStatesByParticipant[key].Keys);
                 foreach (string controlKey in _buttonStatesByParticipantButtonStateKeys)
                 {
-                    InternalButtonState oldButtonState = _buttonStatesByParticipant[key][controlKey];
-                    InternalButtonState newButtonState = new InternalButtonState();
-                    InternalButtonCountState buttonCountState = new InternalButtonCountState();
+                    _InternalButtonState oldButtonState = _buttonStatesByParticipant[key][controlKey];
+                    _InternalButtonState newButtonState = new _InternalButtonState();
+                    _InternalButtonCountState buttonCountState = new _InternalButtonCountState();
                     buttonCountState.PreviousCountOfButtonDownEvents = oldButtonState.ButtonCountState.CountOfButtonDownEvents;
                     buttonCountState.CountOfButtonDownEvents = oldButtonState.ButtonCountState.NextCountOfButtonDownEvents;
                     buttonCountState.NextCountOfButtonDownEvents = 0;
@@ -3653,11 +3748,61 @@ namespace Microsoft.Mixer
                 }
             }
 
+            // Mouse button state
+            List<uint> _mouseButtonStateByParticipantKeys = new List<uint>(_mouseButtonStateByParticipant.Keys);
+            foreach (uint _mouseButtonStateByParticipantKey in _mouseButtonStateByParticipantKeys)
+            {
+                _InternalMouseButtonState oldMouseButtonState = _mouseButtonStateByParticipant[_mouseButtonStateByParticipantKey];
+                _InternalMouseButtonState newMouseButtonState = new _InternalMouseButtonState();
+                // If we just recieved a mouse down, but not an up, then the state is pressed
+                if (oldMouseButtonState.NextIsDown)
+                {
+                    newMouseButtonState.IsDown = true;
+                    newMouseButtonState.IsPressed = true;
+                    newMouseButtonState.IsUp = false;
+
+                    newMouseButtonState.NextIsDown = false;
+                    newMouseButtonState.NextIsPressed = true;
+                    newMouseButtonState.NextIsUp = false;
+                }
+                else if (oldMouseButtonState.NextIsUp)
+                {
+                    newMouseButtonState.IsDown = false;
+                    newMouseButtonState.IsPressed = false;
+                    newMouseButtonState.IsUp = true;
+
+                    newMouseButtonState.NextIsDown = false;
+                    newMouseButtonState.NextIsPressed = false;
+                    newMouseButtonState.NextIsUp = false;
+                }
+                else if (oldMouseButtonState.NextIsPressed)
+                {
+                    newMouseButtonState.IsDown = false;
+                    newMouseButtonState.IsPressed = true;
+                    newMouseButtonState.IsUp = false;
+
+                    newMouseButtonState.NextIsDown = false;
+                    newMouseButtonState.NextIsPressed = true;
+                    newMouseButtonState.NextIsUp = false;
+                }
+                else
+                {
+                    newMouseButtonState.IsDown = false;
+                    newMouseButtonState.IsPressed = false;
+                    newMouseButtonState.IsUp = false;
+
+                    newMouseButtonState.NextIsDown = false;
+                    newMouseButtonState.NextIsPressed = false;
+                    newMouseButtonState.NextIsUp = false;
+                }
+                _mouseButtonStateByParticipant[_mouseButtonStateByParticipantKey] = newMouseButtonState;
+            }
+
             var controlIDKeys = new List<string>(_participantsWhoTriggeredGiveInput.Keys);
             foreach (string controlIDKey in controlIDKeys)
             {
-                InternalParticipantTrackingState oldParticipantTrackingState = _participantsWhoTriggeredGiveInput[controlIDKey];
-                InternalParticipantTrackingState newParticipantTrackingState = new InternalParticipantTrackingState();
+                _InternalParticipantTrackingState oldParticipantTrackingState = _participantsWhoTriggeredGiveInput[controlIDKey];
+                _InternalParticipantTrackingState newParticipantTrackingState = new _InternalParticipantTrackingState();
 
                 newParticipantTrackingState.previousParticpant = oldParticipantTrackingState.particpant;
                 newParticipantTrackingState.particpant = oldParticipantTrackingState.nextParticpant;
@@ -3686,12 +3831,12 @@ namespace Microsoft.Mixer
             // Make sure the entry exists
             uint participantId = e.Participant.UserID;
             string controlID = e.ControlID;
-            Dictionary<string, InternalButtonState> buttonState;
+            Dictionary<string, _InternalButtonState> buttonState;
             bool participantEntryExists = _buttonStatesByParticipant.TryGetValue(participantId, out buttonState);
             if (!participantEntryExists)
             {
-                buttonState = new Dictionary<string, InternalButtonState>();
-                InternalButtonState newControlButtonState = new InternalButtonState();
+                buttonState = new Dictionary<string, _InternalButtonState>();
+                _InternalButtonState newControlButtonState = new _InternalButtonState();
                 newControlButtonState.IsDown = e.IsPressed;
                 newControlButtonState.IsPressed = e.IsPressed;
                 newControlButtonState.IsUp = !e.IsPressed;
@@ -3700,12 +3845,12 @@ namespace Microsoft.Mixer
             }
             else
             {
-                InternalButtonState controlButtonState;
+                _InternalButtonState controlButtonState;
                 bool previousStateControlEntryExists = buttonState.TryGetValue(controlID, out controlButtonState);
                 if (!previousStateControlEntryExists)
                 {
-                    controlButtonState = new InternalButtonState();
-                    InternalButtonState newControlButtonState = new InternalButtonState();
+                    controlButtonState = new _InternalButtonState();
+                    _InternalButtonState newControlButtonState = new _InternalButtonState();
                     newControlButtonState.IsDown = e.IsPressed;
                     newControlButtonState.IsPressed = e.IsPressed;
                     newControlButtonState.IsUp = !e.IsPressed;
@@ -3716,7 +3861,7 @@ namespace Microsoft.Mixer
             // Populate the structure that's by participant
             bool wasPreviouslyPressed = _buttonStatesByParticipant[participantId][controlID].ButtonCountState.NextCountOfButtonPressEvents > 0;
             bool isCurrentlyPressed = e.IsPressed;
-            InternalButtonState newState = _buttonStatesByParticipant[participantId][controlID];
+            _InternalButtonState newState = _buttonStatesByParticipant[participantId][controlID];
             if (isCurrentlyPressed)
             {
                 if (!wasPreviouslyPressed)
@@ -3741,7 +3886,7 @@ namespace Microsoft.Mixer
             }
 
             // Fill in the button counts
-            InternalButtonCountState ButtonCountState = newState.ButtonCountState;
+            _InternalButtonCountState ButtonCountState = newState.ButtonCountState;
             if (newState.IsDown)
             {
                 ButtonCountState.NextCountOfButtonDownEvents++;
@@ -3763,7 +3908,7 @@ namespace Microsoft.Mixer
             _buttonStatesByParticipant[participantId][controlID] = newState;
 
             // Populate button count state
-            InternalButtonCountState existingButtonCountState;
+            _InternalButtonCountState existingButtonCountState;
             bool buttonStateExists = _buttonStates.TryGetValue(controlID, out existingButtonCountState);
             if (buttonStateExists)
             {
@@ -3780,13 +3925,13 @@ namespace Microsoft.Mixer
             // Make sure the entry exists
             uint participantId = e.Participant.UserID;
             string controlID = e.ControlID;
-            Dictionary<string, InternalJoystickState> joystickByParticipant;
-            InternalJoystickState newJoystickStateByParticipant;
+            Dictionary<string, _InternalJoystickState> joystickByParticipant;
+            _InternalJoystickState newJoystickStateByParticipant;
             bool participantEntryExists = _joystickStatesByParticipant.TryGetValue(participantId, out joystickByParticipant);
             if (!participantEntryExists)
             {
-                joystickByParticipant = new Dictionary<string, InternalJoystickState>();
-                newJoystickStateByParticipant = new InternalJoystickState();
+                joystickByParticipant = new Dictionary<string, _InternalJoystickState>();
+                newJoystickStateByParticipant = new _InternalJoystickState();
                 newJoystickStateByParticipant.X = e.X;
                 newJoystickStateByParticipant.Y = e.Y;
                 newJoystickStateByParticipant.countOfUniqueJoystickInputs = 1;
@@ -3794,7 +3939,7 @@ namespace Microsoft.Mixer
             }
             else
             {
-                newJoystickStateByParticipant = new InternalJoystickState();
+                newJoystickStateByParticipant = new _InternalJoystickState();
                 bool joystickByParticipantEntryExists = joystickByParticipant.TryGetValue(controlID, out newJoystickStateByParticipant);
                 if (!joystickByParticipantEntryExists)
                 {
@@ -3815,7 +3960,7 @@ namespace Microsoft.Mixer
             _joystickStatesByParticipant[e.Participant.UserID][e.ControlID] = newJoystickStateByParticipant;
 
             // Update the joystick state
-            InternalJoystickState newJoystickState;
+            _InternalJoystickState newJoystickState;
             bool joystickEntryExists = joystickByParticipant.TryGetValue(controlID, out newJoystickState);
             if (!joystickEntryExists)
             {
@@ -3862,7 +4007,32 @@ namespace Microsoft.Mixer
             _textboxValuesByParticipant[e.Participant.UserID][e.ControlID] = text;
         }
 
-        internal void QueuePropertyUpdate(string sceneID, string controlID, string name, object value)
+        private void UpdateInternalMouseButtonState(InteractiveMouseButtonEventArgs e)
+        {
+            // Make sure the entry exists
+            uint participantId = e.Participant.UserID;
+            bool isPressed = e.IsPressed;
+            _InternalMouseButtonState buttonState;
+            bool participantEntryExists = _mouseButtonStateByParticipant.TryGetValue(participantId, out buttonState);
+            if (!participantEntryExists)
+            {
+                buttonState = new _InternalMouseButtonState();
+                buttonState.IsDown = false;
+                buttonState.IsPressed = false;
+                buttonState.IsUp = false;
+                buttonState.NextIsDown = e.IsPressed;
+                buttonState.NextIsPressed = e.IsPressed;
+                buttonState.NextIsUp = !e.IsPressed;
+                _mouseButtonStateByParticipant.Add(participantId, buttonState);
+            }
+            _InternalMouseButtonState newState = _mouseButtonStateByParticipant[participantId];
+            newState.NextIsDown = isPressed;
+            newState.NextIsPressed = isPressed;
+            newState.NextIsUp = !isPressed;
+            _mouseButtonStateByParticipant[participantId] = newState;
+        }
+
+        internal void _QueuePropertyUpdate(string sceneID, string controlID, string name, object value)
         {
             // If a scene entry doesn't exist, add one.
             if (!_queuedControlPropertyUpdates.ContainsKey(sceneID))
@@ -3897,7 +4067,7 @@ namespace Microsoft.Mixer
             }
         }
 
-        internal void RegisterControlForValueUpdates(string controlTypeName, List<string> valuesToTrack)
+        internal void _RegisterControlForValueUpdates(string controlTypeName, List<string> valuesToTrack)
         {
             if (!_giveInputControlData.ContainsKey(controlTypeName))
             {
@@ -3913,7 +4083,7 @@ namespace Microsoft.Mixer
             }
         }
 
-        internal string InteractiveControlPropertyToString(InteractiveControlProperty property)
+        internal string _InteractiveControlPropertyToString(InteractiveControlProperty property)
         {
             string controlPropertyString = string.Empty;
             switch (property)
@@ -3950,7 +4120,7 @@ namespace Microsoft.Mixer
         }
     }
 
-    internal struct InternalButtonCountState
+    internal struct _InternalButtonCountState
     {
         internal uint PreviousCountOfButtonDownEvents;
         internal uint PreviousCountOfButtonPressEvents;
@@ -3969,12 +4139,12 @@ namespace Microsoft.Mixer
         internal string NextTransactionID;
     }
 
-    internal struct InternalButtonState
+    internal struct _InternalButtonState
     {
         internal bool IsDown;
         internal bool IsPressed;
         internal bool IsUp;
-        internal InternalButtonCountState ButtonCountState;
+        internal _InternalButtonCountState ButtonCountState;
     }
 
     internal struct InternalControlPropertyUpdateData
@@ -3987,19 +4157,29 @@ namespace Microsoft.Mixer
         }
     }
 
-    internal struct InternalJoystickState
+    internal struct _InternalJoystickState
     {
         internal double X;
         internal double Y;
         internal int countOfUniqueJoystickInputs;
     }
 
-    internal struct InternalParticipantTrackingState
+    internal struct _InternalMouseButtonState
+    {
+        internal bool IsDown;
+        internal bool IsPressed;
+        internal bool IsUp;
+        internal bool NextIsDown;
+        internal bool NextIsPressed;
+        internal bool NextIsUp;
+    }
+
+    internal struct _InternalParticipantTrackingState
     {
         internal InteractiveParticipant previousParticpant;
         internal InteractiveParticipant particpant;
         internal InteractiveParticipant nextParticpant;
-        public InternalParticipantTrackingState(InteractiveParticipant newParticipant)
+        public _InternalParticipantTrackingState(InteractiveParticipant newParticipant)
         {
             nextParticpant = newParticipant;
             particpant = null;

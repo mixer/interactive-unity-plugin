@@ -45,7 +45,7 @@ namespace Microsoft.Mixer
                 double x = 0;
                 if (ControlID != null)
                 {
-                    InternalJoystickState joystickState;
+                    _InternalJoystickState joystickState;
                     if (InteractivityManager._joystickStates.TryGetValue(ControlID, out joystickState))
                     {
                         x = joystickState.X;
@@ -65,7 +65,7 @@ namespace Microsoft.Mixer
                 double y = 0;
                 if (ControlID != null)
                 {
-                    InternalJoystickState joystickState;
+                    _InternalJoystickState joystickState;
                     if (InteractivityManager._joystickStates.TryGetValue(ControlID, out joystickState))
                     {
                         y = joystickState.Y;
@@ -90,7 +90,7 @@ namespace Microsoft.Mixer
         /// <param name="userID">The ID of the participant who used the input control.</param>
         public double GetX(uint userID)
         {
-            return InteractivityManager.SingletonInstance.GetJoystickX(ControlID, userID);
+            return InteractivityManager.SingletonInstance._GetJoystickX(ControlID, userID);
         }
 
         /// <summary>
@@ -99,21 +99,21 @@ namespace Microsoft.Mixer
         /// <param name="userID">The ID of the participant who used the input control.</param>
         public double GetY(uint userID)
         {
-            return InteractivityManager.SingletonInstance.GetJoystickY(ControlID, userID);
+            return InteractivityManager.SingletonInstance._GetJoystickY(ControlID, userID);
         }
 
-        public InteractiveJoystickControl(string controlID, InteractiveEventType type, bool enabled, string helpText, string eTag, string sceneID) : base(controlID, InteractivityManager.CONTROL_TYPE_JOYSTICK, type, enabled, helpText, eTag, sceneID)
+        public InteractiveJoystickControl(string controlID, InteractiveEventType type, bool enabled, string helpText, string eTag, string sceneID) : base(controlID, InteractivityManager._CONTROL_TYPE_JOYSTICK, type, enabled, helpText, eTag, sceneID)
         {
         }
 
-        internal uint UserID;
+        internal uint _userID;
 
-        private bool TryGetJoystickStateByParticipant(uint userID, string controlID, out InternalJoystickState joystickState)
+        private bool TryGetJoystickStateByParticipant(uint userID, string controlID, out _InternalJoystickState joystickState)
         {
-            joystickState = new InternalJoystickState();
+            joystickState = new _InternalJoystickState();
             bool joystickExists = false;
             bool participantExists = false;
-            Dictionary<string, InternalJoystickState> participantControls;
+            Dictionary<string, _InternalJoystickState> participantControls;
             participantExists = InteractivityManager._joystickStatesByParticipant.TryGetValue(userID, out participantControls);
             if (participantExists)
             {

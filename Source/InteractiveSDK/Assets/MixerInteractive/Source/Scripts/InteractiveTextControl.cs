@@ -19,11 +19,11 @@ namespace Microsoft.Mixer
         {
             get
             {
-                return InteractivityManager.SingletonInstance.GetText(ControlID);
+                return InteractivityManager.SingletonInstance._GetText(ControlID);
             }
         }
 
-        public InteractiveTextControl(string controlID, InteractiveEventType type, bool disabled, string helpText, string eTag, string sceneID) : base(controlID, InteractivityManager.CONTROL_KIND_TEXTBOX, type, disabled, helpText, eTag, sceneID)
+        public InteractiveTextControl(string controlID, InteractiveEventType type, bool disabled, string helpText, string eTag, string sceneID) : base(controlID, InteractivityManager._CONTROL_KIND_TEXTBOX, type, disabled, helpText, eTag, sceneID)
         {
         }
     }

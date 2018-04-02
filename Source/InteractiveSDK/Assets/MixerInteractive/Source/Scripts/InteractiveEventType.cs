@@ -62,6 +62,16 @@ namespace Microsoft.Mixer
         Joystick,
 
         /// <summary>
+        /// Events representing mouse button input.
+        /// </summary>
+        MouseButton,
+
+        /// <summary>
+        /// Events representing coordinate input, where input are x, y, z values from 0 to 1.
+        /// </summary>
+        Coordinates,
+
+        /// <summary>
         /// Events representing text input.
         /// </summary>
         TextInput
