@@ -86,10 +86,31 @@ namespace Microsoft.Mixer
         /// </summary>
         /// <param name="name">The name of the control property.</param>
         /// <param name="value">The value of the control property.</param>
+        public void SetProperty(InteractiveControlProperty name, bool value)
+        {
+            SetPropertyImpl(
+                InteractivityManager.SingletonInstance.InteractiveControlPropertyToString(name),
+                value
+                );
+        }
+        public void SetProperty(InteractiveControlProperty name, double value)
+        {
+            SetPropertyImpl(
+                InteractivityManager.SingletonInstance.InteractiveControlPropertyToString(name),
+                value
+                );
+        }
+        public void SetProperty(InteractiveControlProperty name, string value)
+        {
+            SetPropertyImpl(
+                InteractivityManager.SingletonInstance.InteractiveControlPropertyToString(name),
+                value
+                );
+        }
         public void SetProperty(InteractiveControlProperty name, object value)
         {
             SetPropertyImpl(
-                InteractivityManager.SingletonInstance.InteractiveControlPropertyToString(name), 
+                InteractivityManager.SingletonInstance.InteractiveControlPropertyToString(name),
                 value
                 );
         }
@@ -99,14 +120,38 @@ namespace Microsoft.Mixer
         /// </summary>
         /// <param name="name">The name of the control property.</param>
         /// <param name="value">The value of the control property.</param>
+        public void SetProperty(string name, bool value)
+        {
+            SetPropertyImpl(name, value);
+        }
+        public void SetProperty(string name, double value)
+        {
+            SetPropertyImpl(name, value);
+        }
+        public void SetProperty(string name, string value)
+        {
+            SetPropertyImpl(name, value);
+        }
         public void SetProperty(string name, object value)
         {
             SetPropertyImpl(name, value);
         }
 
+        private void SetPropertyImpl(string name, bool value)
+        {
+            InteractivityManager.SingletonInstance._QueuePropertyUpdate(SceneID, ControlID, name, value);
+        }
+        private void SetPropertyImpl(string name, double value)
+        {
+            InteractivityManager.SingletonInstance._QueuePropertyUpdate(SceneID, ControlID, name, value);
+        }
+        private void SetPropertyImpl(string name, string value)
+        {
+            InteractivityManager.SingletonInstance._QueuePropertyUpdate(SceneID, ControlID, name, value);
+        }
         private void SetPropertyImpl(string name, object value)
         {
-            InteractivityManager.SingletonInstance.QueuePropertyUpdate(SceneID, ControlID, name, value);
+            InteractivityManager.SingletonInstance._QueuePropertyUpdate(SceneID, ControlID, name, value);
         }
 
         internal InteractiveControl(string controlID, string kind, InteractiveEventType type, bool disabled, string helpText, string eTag, string sceneID)

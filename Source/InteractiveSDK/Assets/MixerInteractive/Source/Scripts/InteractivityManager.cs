@@ -1327,12 +1327,24 @@ namespace Microsoft.Mixer
                         jsonWriter.WriteStartObject();
                         jsonWriter.WritePropertyName(WS_MESSAGE_KEY_CONTROL_ID);
                         jsonWriter.WriteValue(controlID);
-                        Dictionary<string, object> controlPropertyData = _queuedControlPropertyUpdates[sceneID][controlID].properties;
+                        Dictionary<string, InternalControlPropertyMetaData> controlPropertyData = _queuedControlPropertyUpdates[sceneID][controlID].properties;
                         var controlPropertyDataKeys = controlPropertyData.Keys;
                         foreach (string controlPropertyDataKey in controlPropertyDataKeys)
                         {
                             jsonWriter.WritePropertyName(controlPropertyDataKey);
-                            jsonWriter.WriteValue(controlPropertyData[controlPropertyDataKey].ToString());
+                            InternalControlPropertyMetaData controlPropertyMetaData = controlPropertyData[controlPropertyDataKey];
+                            if (controlPropertyMetaData.type == KnownControlPropertyPrimitiveTypes.Boolean)
+                            {
+                                jsonWriter.WriteValue(controlPropertyMetaData.boolValue);
+                            }
+                            else if (controlPropertyMetaData.type == KnownControlPropertyPrimitiveTypes.Number)
+                            {
+                                jsonWriter.WriteValue(controlPropertyMetaData.numberValue);
+                            }
+                            else
+                            {
+                                jsonWriter.WriteValue(controlPropertyMetaData.stringValue);
+                            }
                         }
                         jsonWriter.WriteEndObject();
                     }
@@ -3868,12 +3880,33 @@ namespace Microsoft.Mixer
             _textboxValuesByParticipant[e.Participant.UserID][e.ControlID] = text;
         }
 
-        internal void QueuePropertyUpdate(string sceneID, string controlID, string name, object value)
+        internal void _QueuePropertyUpdate(string sceneID, string controlID, string name, bool value)
+        {
+            KnownControlPropertyPrimitiveTypes type = KnownControlPropertyPrimitiveTypes.Boolean;
+            _QueuePropertyUpdateImpl(sceneID, controlID, name, type, value);
+        }
+        internal void _QueuePropertyUpdate(string sceneID, string controlID, string name, double value)
+        {
+            KnownControlPropertyPrimitiveTypes type = KnownControlPropertyPrimitiveTypes.Number;
+            _QueuePropertyUpdateImpl(sceneID, controlID, name, type, value);
+        }
+        internal void _QueuePropertyUpdate(string sceneID, string controlID, string name, string value)
+        {
+            KnownControlPropertyPrimitiveTypes type = KnownControlPropertyPrimitiveTypes.String;
+            _QueuePropertyUpdateImpl(sceneID, controlID, name, type, value);
+        }
+        internal void _QueuePropertyUpdate(string sceneID, string controlID, string name, object value)
+        {
+            KnownControlPropertyPrimitiveTypes type = KnownControlPropertyPrimitiveTypes.Unknown;
+            _QueuePropertyUpdateImpl(sceneID, controlID, name, type, value);
+        }
+
+        internal void _QueuePropertyUpdateImpl(string sceneID, string controlID, string name, KnownControlPropertyPrimitiveTypes type, object value)
         {
             // If a scene entry doesn't exist, add one.
             if (!_queuedControlPropertyUpdates.ContainsKey(sceneID))
             {
-                InternalControlPropertyUpdateData controlPropertyData = new InternalControlPropertyUpdateData(name, value);
+                InternalControlPropertyUpdateData controlPropertyData = new InternalControlPropertyUpdateData(name, type, value);
                 Dictionary<string, InternalControlPropertyUpdateData> controlData = new Dictionary<string, InternalControlPropertyUpdateData>();
                 controlData.Add(controlID, controlPropertyData);
                 _queuedControlPropertyUpdates.Add(sceneID, controlData);
@@ -3884,20 +3917,34 @@ namespace Microsoft.Mixer
                 Dictionary<string, InternalControlPropertyUpdateData> controlData = _queuedControlPropertyUpdates[sceneID];
                 if (!controlData.ContainsKey(controlID))
                 {
-                    InternalControlPropertyUpdateData controlPropertyData = new InternalControlPropertyUpdateData(name, value);
+                    InternalControlPropertyUpdateData controlPropertyData = new InternalControlPropertyUpdateData(name, type, value);
                     _queuedControlPropertyUpdates[sceneID].Add(controlID, controlPropertyData);
                 }
                 else
                 {
                     // Control entry exists, but does property entry exist?
                     InternalControlPropertyUpdateData controlPropertyData = controlData[controlID];
-                    if (!controlPropertyData.properties.ContainsKey(name))
+                    InternalControlPropertyMetaData controlPropertyMetaData = new InternalControlPropertyMetaData();
+                    controlPropertyMetaData.type = type;
+                    if (type == KnownControlPropertyPrimitiveTypes.Boolean)
                     {
-                        _queuedControlPropertyUpdates[sceneID][controlID].properties.Add(name, value);
+                        controlPropertyMetaData.boolValue = (bool)value;
+                    }
+                    else if (type == KnownControlPropertyPrimitiveTypes.Number)
+                    {
+                        controlPropertyMetaData.numberValue = (double)value;
                     }
                     else
                     {
-                        _queuedControlPropertyUpdates[sceneID][controlID].properties[name] = value;
+                        controlPropertyMetaData.stringValue = value.ToString();
+                    }
+                    if (!controlPropertyData.properties.ContainsKey(name))
+                    {
+                        _queuedControlPropertyUpdates[sceneID][controlID].properties.Add(name, controlPropertyMetaData);
+                    }
+                    else
+                    {
+                        _queuedControlPropertyUpdates[sceneID][controlID].properties[name] = controlPropertyMetaData;
                     }
                 }
             }
@@ -3985,12 +4032,51 @@ namespace Microsoft.Mixer
 
     internal struct InternalControlPropertyUpdateData
     {
-        internal Dictionary<string, object> properties;
-        public InternalControlPropertyUpdateData(string name, object value)
+        internal Dictionary<string, InternalControlPropertyMetaData> properties;
+        public InternalControlPropertyUpdateData(string name, KnownControlPropertyPrimitiveTypes type, object value)
         {
-            properties = new Dictionary<string, object>();
-            properties.Add(name, value);
+            properties = new Dictionary<string, InternalControlPropertyMetaData>();
+            InternalControlPropertyMetaData typeData = new InternalControlPropertyMetaData();
+            typeData.type = type;
+            // This should never fail, but just in case.
+            try
+            {
+                if (type == KnownControlPropertyPrimitiveTypes.Boolean)
+                {
+                    typeData.boolValue = (bool)value;
+                }
+                else if (type == KnownControlPropertyPrimitiveTypes.Number)
+                {
+                    typeData.numberValue = (double)value;
+                }
+                else
+                {
+                    typeData.stringValue = value.ToString();
+                }
+            }
+            catch (Exception ex)
+            {
+                InteractivityManager.SingletonInstance.LogError("Failed to cast the value to a known type. Exception: " + ex.Message);
+            }
+            properties.Add(name, typeData);
         }
+    }
+
+    internal struct InternalControlPropertyMetaData
+    {
+        public object objectValue;
+        public bool boolValue;
+        public double numberValue;
+        public string stringValue;
+        public KnownControlPropertyPrimitiveTypes type;
+    }
+
+    internal enum KnownControlPropertyPrimitiveTypes
+    {
+        Unknown,
+        Boolean,
+        Number,
+        String
     }
 
     internal struct InternalJoystickState

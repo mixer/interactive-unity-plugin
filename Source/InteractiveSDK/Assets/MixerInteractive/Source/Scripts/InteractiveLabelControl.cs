@@ -52,7 +52,7 @@ namespace Microsoft.Mixer
         public void SetText(string text)
         {
             InteractivityManager interactivityManager = InteractivityManager.SingletonInstance;
-            interactivityManager.QueuePropertyUpdate(
+            interactivityManager._QueuePropertyUpdate(
                 SceneID, 
                 ControlID,
                 interactivityManager.InteractiveControlPropertyToString(InteractiveControlProperty.Text), 
