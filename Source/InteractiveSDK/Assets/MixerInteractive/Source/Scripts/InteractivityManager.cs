@@ -2278,19 +2278,19 @@ namespace Microsoft.Mixer
                                 }
                                 break;
                             case WS_MESSAGE_KEY_EVENT:
-                                string eventValue = jsonReader.ReadAsString();
-                                if (eventValue == EVENT_NAME_MOUSE_DOWN ||
-                                    eventValue == EVENT_NAME_MOUSE_UP ||
-                                    eventValue == EVENT_NAME_KEY_DOWN ||
-                                    eventValue == EVENT_NAME_KEY_UP)
+                                eventName = jsonReader.ReadAsString();
+                                if (eventName == EVENT_NAME_MOUSE_DOWN ||
+                                    eventName == EVENT_NAME_MOUSE_UP ||
+                                    eventName == EVENT_NAME_KEY_DOWN ||
+                                    eventName == EVENT_NAME_KEY_UP)
                                 {
-                                    if (eventValue == EVENT_NAME_MOUSE_DOWN ||
-                                    eventValue == EVENT_NAME_KEY_DOWN)
+                                    if (eventName == EVENT_NAME_MOUSE_DOWN ||
+                                    eventName == EVENT_NAME_KEY_DOWN)
                                     {
                                         isPressed = true;
                                     }
-                                    else if (eventValue == EVENT_NAME_MOUSE_UP ||
-                                    eventValue == EVENT_NAME_KEY_UP)
+                                    else if (eventName == EVENT_NAME_MOUSE_UP ||
+                                    eventName == EVENT_NAME_KEY_UP)
                                     {
                                         isPressed = false;
                                     }
@@ -2540,12 +2540,12 @@ namespace Microsoft.Mixer
             if (inputEvent._kind == _CONTROL_KIND_SCREEN)
             {
                 // Update x, y coordinates
-                if (inputEvent._event == EVENT_NAME_MOVE)
+                if (inputEvent._event == EVENT_NAME_MOUSE_MOVE)
                 {
                     Vector2 newMousePosition = new Vector2(inputEvent._x, inputEvent._y);
                     // Translate the position to screen space.
-                    newMousePosition.x *= Screen.width;
-                    newMousePosition.y *= Screen.height;
+                    newMousePosition.x = newMousePosition.x * Screen.width;
+                    newMousePosition.y = newMousePosition.y * Screen.height;
                     if (_mousePositionsByParticipant.ContainsKey(participantID))
                     {
                         _mousePositionsByParticipant[participantID] = newMousePosition;
@@ -2564,10 +2564,15 @@ namespace Microsoft.Mixer
                 else if (inputEvent._event == EVENT_NAME_MOUSE_DOWN ||
                     inputEvent._event == EVENT_NAME_MOUSE_UP)
                 {
+                    Vector2 newMousePosition = new Vector2(inputEvent._x, inputEvent._y);
+                    // Translate the position to screen space.
+                    newMousePosition.x = newMousePosition.x * Screen.width;
+                    newMousePosition.y = newMousePosition.y * Screen.height;
                     InteractiveMouseButtonEventArgs mouseButtonEventArgs = new InteractiveMouseButtonEventArgs(
                        inputEvent._controlID,
                        participant,
-                       inputEvent._isPressed
+                       inputEvent._isPressed,
+                       newMousePosition
                        );
                     _queuedEvents.Add(mouseButtonEventArgs);
                     UpdateInternalMouseButtonState(mouseButtonEventArgs);
@@ -3566,6 +3571,7 @@ namespace Microsoft.Mixer
         private const string EVENT_NAME_KEY_DOWN = "keydown";
         private const string EVENT_NAME_KEY_UP = "keyup";
         private const string EVENT_NAME_MOVE = "move";
+        private const string EVENT_NAME_MOUSE_MOVE = "mousemove";
         private const string EVENT_NAME_SUBMIT = "submit";
 
         // Message parameters

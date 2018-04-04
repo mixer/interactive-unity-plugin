@@ -77,6 +77,12 @@ public class MixerInteractive : MonoBehaviour
     public delegate void OnInteractiveTextControlEventHandler(object sender, InteractiveTextEventArgs e);
     public static event OnInteractiveTextControlEventHandler OnInteractiveTextControlEvent;
 
+    public delegate void OnInteractiveMouseButtonEventHandler(object sender, InteractiveMouseButtonEventArgs e);
+    public static event OnInteractiveMouseButtonEventHandler OnInteractiveMouseButtonEvent;
+
+    public delegate void OnInteractiveCoordinatesChangedHandler(object sender, InteractiveCoordinatesChangedEventArgs e);
+    public static event OnInteractiveCoordinatesChangedHandler OnInteractiveCoordinatesChangedEvent;
+
     public delegate void OnInteractiveMessageEventHandler(object sender, InteractiveMessageEventArgs e);
     public static event OnInteractiveMessageEventHandler OnInteractiveMessageEvent;
 
@@ -138,6 +144,8 @@ public class MixerInteractive : MonoBehaviour
             interactivityManager.OnInteractiveButtonEvent -= HandleInteractiveButtonEvent;
             interactivityManager.OnInteractiveJoystickControlEvent -= HandleInteractiveJoystickControlEvent;
             interactivityManager.OnInteractiveTextControlEvent -= HandleInteractiveTextControlEvent;
+            interactivityManager.OnInteractiveMouseButtonEvent -= HandleInteractiveMouseButtonEvent;
+            interactivityManager.OnInteractiveCoordinatesChangedEvent -= HandleInteractiveCoordinatesChangedEvent;
             interactivityManager.OnInteractiveMessageEvent -= HandleInteractiveMessageEvent;
 
             interactivityManager.OnError += HandleError;
@@ -145,7 +153,9 @@ public class MixerInteractive : MonoBehaviour
             interactivityManager.OnParticipantStateChanged += HandleParticipantStateChanged;
             interactivityManager.OnInteractiveButtonEvent += HandleInteractiveButtonEvent;
             interactivityManager.OnInteractiveJoystickControlEvent += HandleInteractiveJoystickControlEvent;
-            interactivityManager.OnInteractiveTextControlEvent += HandleInteractiveTextControlEvent; 
+            interactivityManager.OnInteractiveTextControlEvent += HandleInteractiveTextControlEvent;
+            interactivityManager.OnInteractiveMouseButtonEvent += HandleInteractiveMouseButtonEvent;
+            interactivityManager.OnInteractiveCoordinatesChangedEvent += HandleInteractiveCoordinatesChangedEvent;
             interactivityManager.OnInteractiveMessageEvent += HandleInteractiveMessageEvent;
         }
         else
@@ -197,6 +207,16 @@ public class MixerInteractive : MonoBehaviour
     }
 
     private void HandleInteractiveTextControlEvent(object sender, InteractiveTextEventArgs e)
+    {
+        queuedEvents.Add(e);
+    }
+
+    private void HandleInteractiveMouseButtonEvent(object sender, InteractiveMouseButtonEventArgs e)
+    {
+        queuedEvents.Add(e);
+    }
+
+    private void HandleInteractiveCoordinatesChangedEvent(object sender, InteractiveCoordinatesChangedEventArgs e)
     {
         queuedEvents.Add(e);
     }
@@ -307,18 +327,21 @@ public class MixerInteractive : MonoBehaviour
         get
         {
             Vector3 mousePosition = Vector3.zero;
-            Dictionary<uint, Vector2> mousePositionsByParticipant = InteractivityManager._mousePositionsByParticipant;
-            var mousePositionByParticipantKeys = mousePositionsByParticipant.Keys;
-            float totalX = 0;
-            float totalY = 0;
-            foreach (var mousePositionByParticipantKey in mousePositionByParticipantKeys)
+            if (InteractivityManager._mousePositionsByParticipant.Count > 0)
             {
-                totalX += mousePositionsByParticipant[mousePositionByParticipantKey].x;
-                totalY += mousePositionsByParticipant[mousePositionByParticipantKey].y;
+                Dictionary<uint, Vector2> mousePositionsByParticipant = InteractivityManager._mousePositionsByParticipant;
+                var mousePositionByParticipantKeys = mousePositionsByParticipant.Keys;
+                float totalX = 0;
+                float totalY = 0;
+                foreach (var mousePositionByParticipantKey in mousePositionByParticipantKeys)
+                {
+                    totalX += mousePositionsByParticipant[mousePositionByParticipantKey].x;
+                    totalY += mousePositionsByParticipant[mousePositionByParticipantKey].y;
+                }
+                // We average all the mouse positions. Z in always zero.
+                mousePosition.x = totalX / mousePositionByParticipantKeys.Count;
+                mousePosition.y = totalY / mousePositionByParticipantKeys.Count;
             }
-            // We average all the mouse positions. Z in always zero.
-            mousePosition.x = totalX / mousePositionByParticipantKeys.Count;
-            mousePosition.y = totalY / mousePositionByParticipantKeys.Count;
 
             return mousePosition;
         }
@@ -554,6 +577,20 @@ public class MixerInteractive : MonoBehaviour
                         if (OnInteractiveTextControlEvent != null)
                         {
                             OnInteractiveTextControlEvent(this, interactiveEvent as InteractiveTextEventArgs);
+                        }
+                        processedEvents.Add(interactiveEvent);
+                        break;
+                    case InteractiveEventType.MouseButton:
+                        if (OnInteractiveMouseButtonEvent != null)
+                        {
+                            OnInteractiveMouseButtonEvent(this, interactiveEvent as InteractiveMouseButtonEventArgs);
+                        }
+                        processedEvents.Add(interactiveEvent);
+                        break;
+                    case InteractiveEventType.Coordinates:
+                        if (OnInteractiveCoordinatesChangedEvent != null)
+                        {
+                            OnInteractiveCoordinatesChangedEvent(this, interactiveEvent as InteractiveCoordinatesChangedEventArgs);
                         }
                         processedEvents.Add(interactiveEvent);
                         break;
