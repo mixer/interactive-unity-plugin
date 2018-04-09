@@ -295,7 +295,7 @@ namespace Microsoft.Mixer
                 bool getXTokenSucceeded = MixerEraNativePlugin_GetXToken(dataPointer);
                 if (!getXTokenSucceeded)
                 {
-                    LogError("Error: Could not get a Xbox Live token. Make sure you have a user signed in.");
+                    _LogError("Error: Could not get a Xbox Live token. Make sure you have a user signed in.");
                 }
                 _authToken = Marshal.PtrToStringAnsi(dataPointer);
                 pinnedMemory.Free();
