@@ -222,6 +222,23 @@ public class MixerInteractive : MonoBehaviour
     }
 
     /// <summary>
+    /// Gets and sets the token used for authentication with Mixer. 
+    /// You can set the token manually that the SDK will use. 
+    /// Currently, this is only applicable for Xbox One.
+    /// </summary>
+    public static string Token
+    {
+        get
+        {
+            return InteractivityManager.SingletonInstance._authToken;
+        }
+        set
+        {
+            InteractivityManager.SingletonInstance._authToken = value;
+        }
+    }
+
+    /// <summary>
     /// Can query the state of the InteractivityManager.
     /// </summary>
     public static InteractivityState InteractivityState
