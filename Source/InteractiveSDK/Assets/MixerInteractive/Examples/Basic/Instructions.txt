@@ -26,10 +26,10 @@ Instructions
 17. Click the "Save project information" button.
 18. Press play in Unity editor.
 19. Check the "Mixer Interactivity" toggle.
-19. A code will be displayed. Go to http://mixer.com/go and enter the code.
-20. Click yes on the permissions dialog.
-21. Go to your channel: http://mixer.com/<your channel name>.
-22. You can see that you are successfully connected and your button from step 4 will appear.
+20. A code will be displayed. Go to http://mixer.com/go and enter the code.
+21. Click yes on the permissions dialog.
+22. Go to your channel: http://mixer.com/<your channel name>.
+23. You can see that you are successfully connected and your button from step 4 will appear.
 
 Notes:
 If you do not see the code dialog dissapear, you may need to click the 
