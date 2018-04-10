@@ -279,17 +279,20 @@ namespace Microsoft.Mixer
             else
             {
 #if !UNITY_EDITOR && UNITY_XBOXONE
-                // On Xbox Live platforms, we try to get an Xbox Live token
-                var tokenData = new string(' ', 10240);
-                GCHandle pinnedMemory = GCHandle.Alloc(tokenData, GCHandleType.Pinned);
-                System.IntPtr dataPointer = pinnedMemory.AddrOfPinnedObject();
-                bool getXTokenSucceeded = MixerEraNativePlugin_GetXToken(dataPointer);
-                if (!getXTokenSucceeded)
+                if (string.IsNullOrEmpty(_authToken))
                 {
-                    LogError("Error: Could not get a Xbox Live token. Make sure you have a user signed in.");
+                    // On Xbox Live platforms, we try to get an Xbox Live token
+                    var tokenData = new string(' ', 10240);
+                    GCHandle pinnedMemory = GCHandle.Alloc(tokenData, GCHandleType.Pinned);
+                    System.IntPtr dataPointer = pinnedMemory.AddrOfPinnedObject();
+                    bool getXTokenSucceeded = MixerEraNativePlugin_GetXToken(dataPointer);
+                    if (!getXTokenSucceeded)
+                    {
+                        LogError("Error: Could not get a Xbox Live token. Make sure you have a user signed in.");
+                    }
+                    _authToken = Marshal.PtrToStringAnsi(dataPointer);
+                    pinnedMemory.Free();
                 }
-                _authToken = Marshal.PtrToStringAnsi(dataPointer);
-                pinnedMemory.Free();
 #endif
             }
             InitiateConnection();
@@ -1196,11 +1199,15 @@ namespace Microsoft.Mixer
         {
             if (InteractivityState == InteractivityState.NotInitialized)
             {
-                throw new Exception("Error: InteractivityManager must be completely intialized before calling this method.");
+                MixerInteractive.GoInteractive();
             }
-            if (InteractivityState == InteractivityState.InteractivityEnabled)
+            if (InteractivityState == InteractivityState.Initializing || 
+                InteractivityState == InteractivityState.ShortCodeRequired || 
+                InteractivityState == InteractivityState.InteractivityPending ||
+                InteractivityState == InteractivityState.InteractivityEnabled)
             {
-                // Don't throw, just return because we are already interactive.
+                // Don't throw, just return because we are already interactive
+                // or about to go interactive.
                 return;
             }
             // We send a ready message here, but wait for a response from the server before
@@ -3349,7 +3356,7 @@ namespace Microsoft.Mixer
         private uint _currentmessageID = 1;
         private bool _disposed = false;
         private string _authShortCodeRequestHandle;
-        private string _authToken;
+        internal string _authToken;
         private string _oauthRefreshToken;
         private bool _initializedGroups = false;
         private bool _initializedScenes = false;
