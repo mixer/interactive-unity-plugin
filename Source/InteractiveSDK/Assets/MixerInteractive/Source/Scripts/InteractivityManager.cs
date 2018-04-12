@@ -3557,7 +3557,24 @@ namespace Microsoft.Mixer
 
             if (Application.isEditor)
             {
-                LoggingLevel = LoggingLevel.Minimal;
+#if UNITY_EDITOR
+                string loggingLevelAsString = UnityEditor.EditorPrefs.GetString("MixerInteractive_LoggingLevel");
+                switch (loggingLevelAsString)
+                {
+                    case "none":
+                        SingletonInstance.LoggingLevel = LoggingLevel.None;
+                        break;
+                    case "minimal":
+                        SingletonInstance.LoggingLevel = LoggingLevel.Minimal;
+                        break;
+                    case "verbose":
+                        SingletonInstance.LoggingLevel = LoggingLevel.Verbose;
+                        break;
+                    default:
+                        SingletonInstance.LoggingLevel = LoggingLevel.Minimal;
+                        break;
+                };
+#endif
             }
             else
             {
