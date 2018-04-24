@@ -34,6 +34,9 @@ internal class MixerInteractiveHelper: MonoBehaviour
     internal bool runInBackgroundIfInteractive = true;
     internal string defaultSceneID;
     internal Dictionary<string, string> groupSceneMapping = new Dictionary<string, string>();
+    internal List<string> rpcOwningMonoBehaviorNames = new List<string>();
+    internal List<string> rpcMethodNames = new List<string>();
+    internal Dictionary<string, MixerInteractive.RpcCachedMethodInfo> cachedRPCMethods = new Dictionary<string, MixerInteractive.RpcCachedMethodInfo>();
 
     public delegate void OnInternalWebRequestStateChangedEventHandler(object sender, InternalWebRequestStateChangedEventArgs e);
     public event OnInternalWebRequestStateChangedEventHandler OnInternalWebRequestStateChanged;

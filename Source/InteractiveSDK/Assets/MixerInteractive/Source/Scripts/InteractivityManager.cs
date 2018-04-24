@@ -29,7 +29,10 @@ using System.IO;
 using System.Net;
 using System.Net.Security;
 using System.Text;
+using System.Threading;
 using UnityEngine;
+using UnityEngine.Networking;
+using System.Collections;
 #if UNITY_WSA && !UNITY_EDITOR
 using Windows.System.Threading;
 using System.Threading.Tasks;
@@ -44,6 +47,7 @@ using Windows.Data.Json;
 #endif
 #if UNITY_EDITOR || UNITY_STANDALONE || UNITY_IOS || UNITY_ANDROID
 using System.Security.Cryptography.X509Certificates;
+using System.Timers;
 using WebSocketSharp;
 using Microsoft.Win32;
 using System.Collections.Specialized;
@@ -77,11 +81,20 @@ namespace Microsoft.Mixer
         public delegate void OnInteractiveJoystickControlEventHandler(object sender, InteractiveJoystickEventArgs e);
         public event OnInteractiveJoystickControlEventHandler OnInteractiveJoystickControlEvent;
 
+        public delegate void OnInteractiveMouseButtonEventHandler(object sender, InteractiveMouseButtonEventArgs e);
+        public event OnInteractiveMouseButtonEventHandler OnInteractiveMouseButtonEvent;
+
+        public delegate void OnInteractiveCoordinatesChangedHandler(object sender, InteractiveCoordinatesChangedEventArgs e);
+        public event OnInteractiveCoordinatesChangedHandler OnInteractiveCoordinatesChangedEvent;
+
         internal delegate void OnInteractiveTextControlEventHandler(object sender, InteractiveTextEventArgs e);
         internal event OnInteractiveTextControlEventHandler OnInteractiveTextControlEvent;
 
         public delegate void OnInteractiveMessageEventHandler(object sender, InteractiveMessageEventArgs e);
         public event OnInteractiveMessageEventHandler OnInteractiveMessageEvent;
+
+        public delegate void OnInteractiveDoWorkEventHandler(object sender, InteractiveEventArgs e);
+        public event OnInteractiveDoWorkEventHandler OnInteractiveDoWorkEvent;
 
         private static InteractivityManager _singletonInstance;
 
@@ -172,7 +185,7 @@ namespace Microsoft.Mixer
             }
         }
 
-        private IList<InteractiveControl> Controls
+        internal IList<InteractiveControl> Controls
         {
             get
             {
@@ -1278,6 +1291,18 @@ namespace Microsoft.Mixer
                         if (OnInteractiveJoystickControlEvent != null)
                         {
                             OnInteractiveJoystickControlEvent(this, interactiveEvent as InteractiveJoystickEventArgs);
+                        }
+                        break;
+                    case InteractiveEventType.MouseButton:
+                        if (OnInteractiveMouseButtonEvent != null)
+                        {
+                            OnInteractiveMouseButtonEvent(this, interactiveEvent as InteractiveMouseButtonEventArgs);
+                        }
+                        break;
+                    case InteractiveEventType.Coordinates:
+                        if (OnInteractiveCoordinatesChangedEvent != null)
+                        {
+                            OnInteractiveCoordinatesChangedEvent(this, interactiveEvent as InteractiveCoordinatesChangedEventArgs);
                         }
                         break;
                     case InteractiveEventType.TextInput:
@@ -2514,6 +2539,44 @@ namespace Microsoft.Mixer
 
             uint participantID = participant.UserID;
 
+            // Handle screen input
+            if (inputEvent.Kind == CONTROL_KIND_SCREEN)
+            {
+                // Update x, y coordinates
+                if (inputEvent.Event == EVENT_NAME_MOVE)
+                {
+                    Vector2 newMousePosition = new Vector2(inputEvent.X, inputEvent.Y);
+                    // Translate the position to screen space.
+                    newMousePosition.x *= Screen.width;
+                    newMousePosition.y *= Screen.height;
+                    if (_mousePositionsByParticipant.ContainsKey(participantID))
+                    {
+                        _mousePositionsByParticipant[participantID] = newMousePosition;
+                    }
+                    else
+                    {
+                        _mousePositionsByParticipant.Add(participantID, newMousePosition);
+                    }
+                    InteractiveCoordinatesChangedEventArgs mouseMoveEventArgs = new InteractiveCoordinatesChangedEventArgs(
+                       inputEvent.ControlID,
+                       participant,
+                       newMousePosition
+                       );
+                    _queuedEvents.Add(mouseMoveEventArgs);
+                }
+                else if (inputEvent.Event == EVENT_NAME_MOUSE_DOWN ||
+                    inputEvent.Event == EVENT_NAME_MOUSE_UP)
+                {
+                    InteractiveMouseButtonEventArgs mouseButtonEventArgs = new InteractiveMouseButtonEventArgs(
+                       inputEvent.ControlID,
+                       participant,
+                       inputEvent.IsPressed
+                       );
+                    _queuedEvents.Add(mouseButtonEventArgs);
+                    UpdateInternalMouseButtonState(mouseButtonEventArgs);
+                }
+            }
+
             // Put the input key values in the control data structure.
             string controlID = inputEvent.ControlID;
             string controlType = inputEvent.Kind;
@@ -2795,6 +2858,13 @@ namespace Microsoft.Mixer
                 }
             }
             return joystickExists;
+        }
+
+        internal InternalMouseButtonState TryGetMouseButtonState(uint userID)
+        {
+            InternalMouseButtonState mouseButtonState = new InternalMouseButtonState();
+            _mouseButtonStateByParticipant.TryGetValue(userID, out mouseButtonState);
+            return mouseButtonState;
         }
 
         internal string GetText(string controlID, uint userID)
@@ -3442,11 +3512,11 @@ namespace Microsoft.Mixer
         private const string WS_MESSAGE_KEY_Y = "y";
 
         // Values
-        private const string WS_MESSAGE_VALUE_CONTROL_TYPE_BUTTON = "button";
+        internal const string WS_MESSAGE_VALUE_CONTROL_TYPE_BUTTON = "button";
         internal const string WS_MESSAGE_VALUE_DISABLED = "disabled";
         internal const string WS_MESSAGE_VALUE_DEFAULT_GROUP_ID = "default";
         internal const string WS_MESSAGE_VALUE_DEFAULT_SCENE_ID = "default";
-        private const string WS_MESSAGE_VALUE_CONTROL_TYPE_JOYSTICK = "joystick";
+        internal const string WS_MESSAGE_VALUE_CONTROL_TYPE_JOYSTICK = "joystick";
         internal const string WS_MESSAGE_VALUE_CONTROL_TYPE_LABEL = "label";
         internal const string WS_MESSAGE_VALUE_CONTROL_TYPE_TEXTBOX = "textbox";
         private const bool WS_MESSAGE_VALUE_TRUE = true;
@@ -3493,6 +3563,7 @@ namespace Microsoft.Mixer
         internal const string CONTROL_TYPE_JOYSTICK = "joystick";
         internal const string CONTROL_KIND_LABEL = "label";
         internal const string CONTROL_KIND_TEXTBOX = "textbox";
+        internal const string CONTROL_KIND_SCREEN = "screen";
 
         // Event names
         private const string EVENT_NAME_MOUSE_DOWN = "mousedown";
@@ -3519,6 +3590,8 @@ namespace Microsoft.Mixer
         internal static Dictionary<string, InternalJoystickState> _joystickStates;
         internal static Dictionary<uint, Dictionary<string, InternalJoystickState>> _joystickStatesByParticipant;
         internal static Dictionary<uint, Dictionary<string, string>> _textboxValuesByParticipant;
+        internal static Dictionary<uint, InternalMouseButtonState> _mouseButtonStateByParticipant;
+        internal static Dictionary<uint, Vector2> _mousePositionsByParticipant;
 
         // Generic data structures for storing any control data
         internal static Dictionary<string, Dictionary<uint, Dictionary<string, object>>> _giveInputControlDataByParticipant;
@@ -3583,6 +3656,8 @@ namespace Microsoft.Mixer
 
             _joystickStates = new Dictionary<string, InternalJoystickState>();
             _joystickStatesByParticipant = new Dictionary<uint, Dictionary<string, InternalJoystickState>>();
+            _mouseButtonStateByParticipant = new Dictionary<uint, InternalMouseButtonState>();
+            _mousePositionsByParticipant = new Dictionary<uint, Vector2>();
 
             _participantsWhoTriggeredGiveInput = new Dictionary<string, InternalParticipantTrackingState>();
             _queuedControlPropertyUpdates = new Dictionary<string, Dictionary<string, InternalControlPropertyUpdateData>>();
@@ -3693,6 +3768,56 @@ namespace Microsoft.Mixer
                     newButtonState.ButtonCountState = buttonCountState;
                     _buttonStatesByParticipant[key][controlKey] = newButtonState;
                 }
+            }
+
+            // Mouse button state
+            List<uint> _mouseButtonStateByParticipantKeys = new List<uint>(_mouseButtonStateByParticipant.Keys);
+            foreach (uint _mouseButtonStateByParticipantKey in _mouseButtonStateByParticipantKeys)
+            {
+                InternalMouseButtonState oldMouseButtonState = _mouseButtonStateByParticipant[_mouseButtonStateByParticipantKey];
+                InternalMouseButtonState newMouseButtonState = new InternalMouseButtonState();
+                // If we just recieved a mouse down, but not an up, then the state is pressed
+                if (oldMouseButtonState.NextIsDown)
+                {
+                    newMouseButtonState.IsDown = true;
+                    newMouseButtonState.IsPressed = true;
+                    newMouseButtonState.IsUp = false;
+
+                    newMouseButtonState.NextIsDown = false;
+                    newMouseButtonState.NextIsPressed = true;
+                    newMouseButtonState.NextIsUp = false;
+                }
+                else if (oldMouseButtonState.NextIsUp)
+                {
+                    newMouseButtonState.IsDown = false;
+                    newMouseButtonState.IsPressed = false;
+                    newMouseButtonState.IsUp = true;
+
+                    newMouseButtonState.NextIsDown = false;
+                    newMouseButtonState.NextIsPressed = false;
+                    newMouseButtonState.NextIsUp = false;
+                }
+                else if (oldMouseButtonState.NextIsPressed)
+                {
+                    newMouseButtonState.IsDown = false;
+                    newMouseButtonState.IsPressed = true;
+                    newMouseButtonState.IsUp = false;
+
+                    newMouseButtonState.NextIsDown = false;
+                    newMouseButtonState.NextIsPressed = true;
+                    newMouseButtonState.NextIsUp = false;
+                }
+                else
+                {
+                    newMouseButtonState.IsDown = false;
+                    newMouseButtonState.IsPressed = false;
+                    newMouseButtonState.IsUp = false;
+
+                    newMouseButtonState.NextIsDown = false;
+                    newMouseButtonState.NextIsPressed = false;
+                    newMouseButtonState.NextIsUp = false;
+                }
+                _mouseButtonStateByParticipant[_mouseButtonStateByParticipantKey] = newMouseButtonState;
             }
 
             var controlIDKeys = new List<string>(_participantsWhoTriggeredGiveInput.Keys);
@@ -3904,6 +4029,31 @@ namespace Microsoft.Mixer
             _textboxValuesByParticipant[e.Participant.UserID][e.ControlID] = text;
         }
 
+        private void UpdateInternalMouseButtonState(InteractiveMouseButtonEventArgs e)
+        {
+            // Make sure the entry exists
+            uint participantId = e.Participant.UserID;
+            bool isPressed = e.IsPressed;
+            InternalMouseButtonState buttonState;
+            bool participantEntryExists = _mouseButtonStateByParticipant.TryGetValue(participantId, out buttonState);
+            if (!participantEntryExists)
+            {
+                buttonState = new InternalMouseButtonState();
+                buttonState.IsDown = false;
+                buttonState.IsPressed = false;
+                buttonState.IsUp = false;
+                buttonState.NextIsDown = e.IsPressed;
+                buttonState.NextIsPressed = e.IsPressed;
+                buttonState.NextIsUp = !e.IsPressed;
+                _mouseButtonStateByParticipant.Add(participantId, buttonState);
+            }
+            InternalMouseButtonState newState = _mouseButtonStateByParticipant[participantId];
+            newState.NextIsDown = isPressed;
+            newState.NextIsPressed = isPressed;
+            newState.NextIsUp = !isPressed;
+            _mouseButtonStateByParticipant[participantId] = newState;
+        }
+
         internal void _QueuePropertyUpdate(string sceneID, string controlID, string name, bool value)
         {
             KnownControlPropertyPrimitiveTypes type = KnownControlPropertyPrimitiveTypes.Boolean;
@@ -4108,6 +4258,16 @@ namespace Microsoft.Mixer
         internal double X;
         internal double Y;
         internal int countOfUniqueJoystickInputs;
+    }
+
+    internal struct InternalMouseButtonState
+    {
+        internal bool IsDown;
+        internal bool IsPressed;
+        internal bool IsUp;
+        internal bool NextIsDown;
+        internal bool NextIsPressed;
+        internal bool NextIsUp;
     }
 
     internal struct InternalParticipantTrackingState
