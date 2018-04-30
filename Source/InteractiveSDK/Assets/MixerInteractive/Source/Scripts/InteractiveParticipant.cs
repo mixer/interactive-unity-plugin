@@ -82,7 +82,7 @@ namespace Microsoft.Mixer
                 List<InteractiveGroup> allGroups = InteractivityManager.SingletonInstance.Groups as List<InteractiveGroup>;
                 foreach (InteractiveGroup group in allGroups)
                 {
-                    if (group.GroupID == groupID)
+                    if (group.GroupID == _groupID)
                     {
                         return group;
                     }
@@ -93,11 +93,11 @@ namespace Microsoft.Mixer
             {
                 if (value == null)
                 {
-                    InteractivityManager.SingletonInstance.LogError("Error: You cannot assign 'null' as the group value.");
+                    InteractivityManager.SingletonInstance._LogError("Error: You cannot assign 'null' as the group value.");
                     return;
                 }
-                groupID = value.GroupID;
-                InteractivityManager.SingletonInstance.SendUpdateParticipantsMessage(this);
+                _groupID = value.GroupID;
+                InteractivityManager.SingletonInstance._SendUpdateParticipantsMessage(this);
             }
         }
 
@@ -145,7 +145,7 @@ namespace Microsoft.Mixer
             get
             {
                 List<InteractiveButtonControl> buttonsForParticipant = new List<InteractiveButtonControl>();
-                Dictionary<string, InternalButtonState> buttonState;
+                Dictionary<string, _InternalButtonState> buttonState;
                 bool participantEntryExists = InteractivityManager._buttonStatesByParticipant.TryGetValue(UserID, out buttonState);
                 if (participantEntryExists)
                 {
@@ -175,7 +175,7 @@ namespace Microsoft.Mixer
             get
             {
                 List<InteractiveJoystickControl> joysticksForParticipant = new List<InteractiveJoystickControl>();
-                Dictionary<string, InternalJoystickState> joystickByParticipant;
+                Dictionary<string, _InternalJoystickState> joystickByParticipant;
                 bool participantEntryExists = InteractivityManager._joystickStatesByParticipant.TryGetValue(UserID, out joystickByParticipant);
                 if (participantEntryExists)
                 {
@@ -206,14 +206,14 @@ namespace Microsoft.Mixer
             internal set;
         }
 
-        internal string etag;
-        internal string groupID;
-        internal string sessionID;
+        internal string _etag;
+        internal string _groupID;
+        internal string _sessionID;
         private List<string> channelGroups;
 
         internal InteractiveParticipant(string newSessionID, string newEtag, uint userID, string newGroupID, string userName, List<string> newChannelGroups, uint level, DateTime lastInputAt, DateTime connectedAt, bool inputDisabled, InteractiveParticipantState state)
         {
-            sessionID = newSessionID;
+            _sessionID = newSessionID;
             UserID = userID;
             UserName = userName;
             channelGroups = newChannelGroups;
@@ -222,8 +222,8 @@ namespace Microsoft.Mixer
             ConnectedAt = connectedAt;
             InputDisabled = inputDisabled;
             State = state;
-            groupID = newGroupID;
-            etag = newEtag;
+            _groupID = newGroupID;
+            _etag = newEtag;
         }
     }
 }

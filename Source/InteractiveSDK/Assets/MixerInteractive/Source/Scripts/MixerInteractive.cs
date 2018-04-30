@@ -78,6 +78,12 @@ public class MixerInteractive : MonoBehaviour
     public delegate void OnInteractiveJoystickControlEventHandler(object sender, InteractiveJoystickEventArgs e);
     public static event OnInteractiveJoystickControlEventHandler OnInteractiveJoystickControlEvent;
 
+    public delegate void OnInteractiveMouseButtonEventHandler(object sender, InteractiveMouseButtonEventArgs e);
+    public static event OnInteractiveMouseButtonEventHandler OnInteractiveMouseButtonEvent;
+
+    public delegate void OnInteractiveCoordinatesChangedHandler(object sender, InteractiveCoordinatesChangedEventArgs e);
+    public static event OnInteractiveCoordinatesChangedHandler OnInteractiveCoordinatesChangedEvent;
+
     public delegate void OnInteractiveTextControlEventHandler(object sender, InteractiveTextEventArgs e);
     public static event OnInteractiveTextControlEventHandler OnInteractiveTextControlEvent;
 
@@ -105,7 +111,7 @@ public class MixerInteractive : MonoBehaviour
     public List<string> rpcMethodNames;
 
     private static List<string> outboundMessages;
-    internal static Websocket websocket;
+    internal static Websocket _websocket;
 
 #if !UNITY_WSA || UNITY_EDITOR
     private static BackgroundWorker backgroundWorker;
@@ -113,7 +119,7 @@ public class MixerInteractive : MonoBehaviour
 
     private const string DEFAULT_GROUP_ID = "default";
     private const float CHECK_FOR_OUTSTANDING_REQUESTS_INTERVAL = 1f;
-    internal const float DEFAULT_MIXER_SYNCVAR_UPDATE_INTERVAL = 1f;
+    internal const float _DEFAULT_MIXER_SYNCVAR_UPDATE_INTERVAL = 1f;
 
     void Awake()
     {
@@ -150,6 +156,8 @@ public class MixerInteractive : MonoBehaviour
             interactivityManager.OnParticipantStateChanged -= HandleParticipantStateChanged;
             interactivityManager.OnInteractiveButtonEvent -= HandleInteractiveButtonEvent;
             interactivityManager.OnInteractiveJoystickControlEvent -= HandleInteractiveJoystickControlEvent;
+            interactivityManager.OnInteractiveMouseButtonEvent -= HandleInteractiveMouseButtonEvent;
+            interactivityManager.OnInteractiveCoordinatesChangedEvent -= HandleInteractiveCoordinatesChangedHandler;
             interactivityManager.OnInteractiveTextControlEvent -= HandleInteractiveTextControlEvent;
             interactivityManager.OnInteractiveMessageEvent -= HandleInteractiveMessageEvent;
 
@@ -157,6 +165,8 @@ public class MixerInteractive : MonoBehaviour
             interactivityManager.OnInteractivityStateChanged += HandleInteractivityStateChanged;
             interactivityManager.OnParticipantStateChanged += HandleParticipantStateChanged;
             interactivityManager.OnInteractiveButtonEvent += HandleInteractiveButtonEvent;
+            interactivityManager.OnInteractiveMouseButtonEvent += HandleInteractiveMouseButtonEvent;
+            interactivityManager.OnInteractiveCoordinatesChangedEvent += HandleInteractiveCoordinatesChangedHandler;
             interactivityManager.OnInteractiveJoystickControlEvent += HandleInteractiveJoystickControlEvent;
             interactivityManager.OnInteractiveTextControlEvent += HandleInteractiveTextControlEvent; 
             interactivityManager.OnInteractiveMessageEvent += HandleInteractiveMessageEvent;
@@ -165,16 +175,16 @@ public class MixerInteractive : MonoBehaviour
         {
             interactivityManagerAlreadyInitialized = true;
         }
-        MixerInteractiveHelper helper = MixerInteractiveHelper.SingletonInstance;
-        helper.runInBackgroundIfInteractive = runInBackground;
-        helper.defaultSceneID = defaultSceneID;
+        MixerInteractiveHelper helper = MixerInteractiveHelper._SingletonInstance;
+        helper._runInBackgroundIfInteractive = runInBackground;
+        helper._defaultSceneID = defaultSceneID;
         for (int i = 0; i < groupIDs.Count; i++)
         {
             string groupID = groupIDs[i];
             if (groupID != string.Empty &&
-                !helper.groupSceneMapping.ContainsKey(groupID))
+                !helper._groupSceneMapping.ContainsKey(groupID))
             {
-                helper.groupSceneMapping.Add(groupID, sceneIDs[i]);
+                helper._groupSceneMapping.Add(groupID, sceneIDs[i]);
             }
         }
 
@@ -196,11 +206,21 @@ public class MixerInteractive : MonoBehaviour
         {
             ProcessSerializedProperties();
         }
-        websocket = gameObject.AddComponent<Websocket>();
-        InteractivityManager.SingletonInstance.SetWebsocketInstance(websocket);
+        _websocket = gameObject.AddComponent<Websocket>();
+        InteractivityManager.SingletonInstance.SetWebsocketInstance(_websocket);
     }
 
     private static void HandleInteractiveJoystickControlEvent(object sender, InteractiveJoystickEventArgs e)
+    {
+        queuedEvents.Add(e);
+    }
+
+    private static void HandleInteractiveMouseButtonEvent(object sender, InteractiveMouseButtonEventArgs e)
+    {
+        queuedEvents.Add(e);
+    }
+
+    private static void HandleInteractiveCoordinatesChangedHandler(object sender, InteractiveCoordinatesChangedEventArgs e)
     {
         queuedEvents.Add(e);
     }
@@ -251,7 +271,7 @@ public class MixerInteractive : MonoBehaviour
     {
         bool found = false;
         RpcCachedMethodInfo rpcCachedMethodInfo = new RpcCachedMethodInfo();
-        var helper = MixerInteractiveHelper.SingletonInstance;
+        var helper = MixerInteractiveHelper._SingletonInstance;
         if (helper.cachedRPCMethods.TryGetValue(methodName, out rpcCachedMethodInfo))
         {
             // Invoke the function
@@ -285,8 +305,7 @@ public class MixerInteractive : MonoBehaviour
             return;
         }
 
-        var helper = MixerInteractiveHelper.SingletonInstance;
-        // TODO: Need to performance profile this for 1000 game objects.
+        var helper = MixerInteractiveHelper._SingletonInstance;
         MonoBehaviour[] activeBehaviors = owningGameObject.GetComponents<MonoBehaviour>();
         foreach (string rpcMethodName in rpcMethodNames)
         {
@@ -321,7 +340,7 @@ public class MixerInteractive : MonoBehaviour
     private static void RefreshRPCMethods(bool includeMethodsFromTheInspector = false)
     {
         // Add all methods with the "MixerRpcMethod" to our method cache.
-        var helper = MixerInteractiveHelper.SingletonInstance;
+        var helper = MixerInteractiveHelper._SingletonInstance;
         MonoBehaviour[] activeBehaviors = FindObjectsOfType<MonoBehaviour>();
         foreach (MonoBehaviour monoBehavior in activeBehaviors)
         {
@@ -382,8 +401,6 @@ public class MixerInteractive : MonoBehaviour
     private static void SerializeSyncVars()
     {
         // Get all syncvars
-        // TODO: We need an editor version of this so devs can set properties on the 
-        // syncvars like how often they get sent.
         MonoBehaviour[] activeBehaviors = GameObject.FindObjectsOfType<MonoBehaviour>();
         foreach (MonoBehaviour monoBehavior in activeBehaviors)
         {
@@ -533,18 +550,21 @@ public class MixerInteractive : MonoBehaviour
         get
         {
             Vector3 mousePosition = Vector3.zero;
-            Dictionary<uint, Vector2> mousePositionsByParticipant = InteractivityManager._mousePositionsByParticipant;
-            var mousePositionByParticipantKeys = mousePositionsByParticipant.Keys;
-            float totalX = 0;
-            float totalY = 0;
-            foreach (var mousePositionByParticipantKey in mousePositionByParticipantKeys)
+            if (InteractivityManager._mousePositionsByParticipant.Count > 0)
             {
-                totalX += mousePositionsByParticipant[mousePositionByParticipantKey].x;
-                totalY += mousePositionsByParticipant[mousePositionByParticipantKey].y;
+                Dictionary<uint, Vector2> mousePositionsByParticipant = InteractivityManager._mousePositionsByParticipant;
+                var mousePositionByParticipantKeys = mousePositionsByParticipant.Keys;
+                float totalX = 0;
+                float totalY = 0;
+                foreach (var mousePositionByParticipantKey in mousePositionByParticipantKeys)
+                {
+                    totalX += mousePositionsByParticipant[mousePositionByParticipantKey].x;
+                    totalY += mousePositionsByParticipant[mousePositionByParticipantKey].y;
+                }
+                // We average all the mouse positions. Z in always zero.
+                mousePosition.x = totalX / mousePositionByParticipantKeys.Count;
+                mousePosition.y = totalY / mousePositionByParticipantKeys.Count;
             }
-            // We average all the mouse positions. Z in always zero.
-            mousePosition.x = totalX / mousePositionByParticipantKeys.Count;
-            mousePosition.y = totalY / mousePositionByParticipantKeys.Count;
 
             return mousePosition;
         }
@@ -573,7 +593,7 @@ public class MixerInteractive : MonoBehaviour
     {
         // Find which participant send the input for the given control.
         InteractiveParticipant participant = null;
-        InternalParticipantTrackingState participantTrackingState = new InternalParticipantTrackingState();
+        _InternalParticipantTrackingState participantTrackingState = new _InternalParticipantTrackingState();
         bool participantTrackingStateEntryExists = InteractivityManager._participantsWhoTriggeredGiveInput.TryGetValue(controlID, out participantTrackingState);
         if (participantTrackingStateEntryExists)
         {
@@ -646,7 +666,7 @@ public class MixerInteractive : MonoBehaviour
     {
         InteractivityManager.SingletonInstance.StopInteractive();
         pendingGoInteractive = false;
-        if (MixerInteractiveHelper.SingletonInstance.runInBackgroundIfInteractive)
+        if (MixerInteractiveHelper._SingletonInstance._runInBackgroundIfInteractive)
         {
             Application.runInBackground = previousRunInBackgroundValue;
         }
@@ -776,6 +796,20 @@ public class MixerInteractive : MonoBehaviour
                         if (OnInteractiveJoystickControlEvent != null)
                         {
                             OnInteractiveJoystickControlEvent(this, interactiveEvent as InteractiveJoystickEventArgs);
+                        }
+                        processedEvents.Add(interactiveEvent);
+                        break;
+                    case InteractiveEventType.MouseButton:
+                        if (OnInteractiveMouseButtonEvent != null)
+                        {
+                            OnInteractiveMouseButtonEvent(this, interactiveEvent as InteractiveMouseButtonEventArgs);
+                        }
+                        processedEvents.Add(interactiveEvent);
+                        break;
+                    case InteractiveEventType.Coordinates:
+                        if (OnInteractiveCoordinatesChangedEvent != null)
+                        {
+                            OnInteractiveCoordinatesChangedEvent(this, interactiveEvent as InteractiveCoordinatesChangedEventArgs);
                         }
                         processedEvents.Add(interactiveEvent);
                         break;
@@ -929,7 +963,7 @@ public class MixerInteractive : MonoBehaviour
     public static bool GetMouseButtonDown(int buttonIndex = 0)
     {
         bool getButtonDownResult = false;
-        Dictionary<uint, InternalMouseButtonState> mouseButtonStateByParticipant = InteractivityManager._mouseButtonStateByParticipant;
+        Dictionary<uint, _InternalMouseButtonState> mouseButtonStateByParticipant = InteractivityManager._mouseButtonStateByParticipant;
         var mouseButtonStateByParticipantKeys = mouseButtonStateByParticipant.Keys;
         foreach (uint mouseButtonStateByParticipantKey in mouseButtonStateByParticipantKeys)
         {
@@ -952,7 +986,7 @@ public class MixerInteractive : MonoBehaviour
     public static bool GetMouseButton(int buttonIndex = 0)
     {
         bool getButtonDownResult = false;
-        Dictionary<uint, InternalMouseButtonState> mouseButtonStateByParticipant = InteractivityManager._mouseButtonStateByParticipant;
+        Dictionary<uint, _InternalMouseButtonState> mouseButtonStateByParticipant = InteractivityManager._mouseButtonStateByParticipant;
         var mouseButtonStateByParticipantKeys = mouseButtonStateByParticipant.Keys;
         foreach (uint mouseButtonStateByParticipantKey in mouseButtonStateByParticipantKeys)
         {
@@ -975,7 +1009,7 @@ public class MixerInteractive : MonoBehaviour
     public static bool GetMouseButtonUp(int buttonIndex = 0)
     {
         bool getButtonDownResult = false;
-        Dictionary<uint, InternalMouseButtonState> mouseButtonStateByParticipant = InteractivityManager._mouseButtonStateByParticipant;
+        Dictionary<uint, _InternalMouseButtonState> mouseButtonStateByParticipant = InteractivityManager._mouseButtonStateByParticipant;
         var mouseButtonStateByParticipantKeys = mouseButtonStateByParticipant.Keys;
         foreach (uint mouseButtonStateByParticipantKey in mouseButtonStateByParticipantKeys)
         {
@@ -1090,7 +1124,7 @@ public class MixerInteractive : MonoBehaviour
     /// <returns>Returns the interactive control matching the given ID.</returns>
     public static InteractiveControl GetControl(string controlID)
     {
-        return InteractivityManager.SingletonInstance.GetControl(controlID);
+        return InteractivityManager.SingletonInstance._GetControl(controlID);
     }
 
     /// <summary>
@@ -1100,7 +1134,7 @@ public class MixerInteractive : MonoBehaviour
     /// <returns>Returns a list of InteractiveTextResult objects. Returns an empty list if there was no input.</returns>
     public static IList<InteractiveTextResult> GetText(string controlID)
     {
-        return InteractivityManager.SingletonInstance.GetText(controlID);
+        return InteractivityManager.SingletonInstance._GetText(controlID);
     }
 
     /// <summary>
@@ -1138,7 +1172,7 @@ public class MixerInteractive : MonoBehaviour
         backgroundWorker.RunWorkerAsync();
 #endif
 
-        if (MixerInteractiveHelper.SingletonInstance.runInBackgroundIfInteractive)
+        if (MixerInteractiveHelper._SingletonInstance._runInBackgroundIfInteractive)
         {
             previousRunInBackgroundValue = Application.runInBackground;
             Application.runInBackground = true;
@@ -1189,17 +1223,17 @@ public class MixerInteractive : MonoBehaviour
 
     private static void ProcessSerializedProperties()
     {
-        MixerInteractiveHelper helper = MixerInteractiveHelper.SingletonInstance;
+        MixerInteractiveHelper helper = MixerInteractiveHelper._SingletonInstance;
         InteractivityManager interactivityManager = InteractivityManager.SingletonInstance;
-        string defaultSceneID = helper.defaultSceneID;
-        if (helper.groupSceneMapping.Count > 0 ||
+        string defaultSceneID = helper._defaultSceneID;
+        if (helper._groupSceneMapping.Count > 0 ||
             defaultSceneID != string.Empty)
         {
             shouldCheckForOutstandingRequests = true;
         }
-        if (helper.groupSceneMapping.Count > 0)
+        if (helper._groupSceneMapping.Count > 0)
         {
-            var groupIDs = helper.groupSceneMapping.Keys;
+            var groupIDs = helper._groupSceneMapping.Keys;
             foreach (var groupID in groupIDs)
             {
                 if (groupID == string.Empty)
@@ -1211,7 +1245,7 @@ public class MixerInteractive : MonoBehaviour
 #pragma warning disable 0219
                 InteractiveGroup group;
 #pragma warning restore 0219
-                string sceneID = helper.groupSceneMapping[groupID];
+                string sceneID = helper._groupSceneMapping[groupID];
                 if (sceneID != string.Empty)
                 {
                     group = new InteractiveGroup(groupID, sceneID);
@@ -1427,7 +1461,7 @@ public class MixerInteractive : MonoBehaviour
 public class MixerSyncVar : Attribute
 {
     public float updateInterval;
-    public MixerSyncVar(double newUpdateInterval = MixerInteractive.DEFAULT_MIXER_SYNCVAR_UPDATE_INTERVAL)
+    public MixerSyncVar(double newUpdateInterval = MixerInteractive._DEFAULT_MIXER_SYNCVAR_UPDATE_INTERVAL)
     {
         updateInterval = (float)newUpdateInterval;
     }

@@ -31,14 +31,14 @@ using UnityEngine.Networking;
 
 internal class MixerInteractiveHelper: MonoBehaviour
 {
-    internal bool runInBackgroundIfInteractive = true;
-    internal string defaultSceneID;
-    internal Dictionary<string, string> groupSceneMapping = new Dictionary<string, string>();
+    internal bool _runInBackgroundIfInteractive = true;
+    internal string _defaultSceneID;
+    internal Dictionary<string, string> _groupSceneMapping = new Dictionary<string, string>();
     internal List<string> rpcOwningMonoBehaviorNames = new List<string>();
     internal List<string> rpcMethodNames = new List<string>();
     internal Dictionary<string, MixerInteractive.RpcCachedMethodInfo> cachedRPCMethods = new Dictionary<string, MixerInteractive.RpcCachedMethodInfo>();
 
-    public delegate void OnInternalWebRequestStateChangedEventHandler(object sender, InternalWebRequestStateChangedEventArgs e);
+    public delegate void OnInternalWebRequestStateChangedEventHandler(object sender, _InternalWebRequestStateChangedEventArgs e);
     public event OnInternalWebRequestStateChangedEventHandler OnInternalWebRequestStateChanged;
 
     public delegate void OnInternalCheckAuthStatusCallbackEventHandler(object sender, InternalTimerCallbackEventArgs e);
@@ -53,7 +53,7 @@ internal class MixerInteractiveHelper: MonoBehaviour
     public delegate void OnTryGetAuthTokensFromCacheCallbackEventHandler(object sender, TryGetAuthTokensFromCacheEventArgs e);
     public event OnTryGetAuthTokensFromCacheCallbackEventHandler OnTryGetAuthTokensFromCacheCallback;
 
-    private List<InteractiveWebRequestData> _queuedWebRequests;
+    private List<_InteractiveWebRequestData> _queuedWebRequests;
     private List<InteractiveTimerData> _queuedStartTimerRequests;
     private List<InteractiveTimerType> _queuedStopTimerRequests;
     private List<CoRoutineInfo> _runningCoRoutines;
@@ -63,7 +63,7 @@ internal class MixerInteractiveHelper: MonoBehaviour
     private string _refreshTokenValueToWriteToCache;
 
     private static MixerInteractiveHelper _singletonInstance;
-    internal static MixerInteractiveHelper SingletonInstance
+    internal static MixerInteractiveHelper _SingletonInstance
     {
         get
         {
@@ -84,7 +84,7 @@ internal class MixerInteractiveHelper: MonoBehaviour
     {
         if (_singletonInstance != null)
         {
-            foreach (InteractiveWebRequestData _queuedWebRequest in _queuedWebRequests)
+            foreach (_InteractiveWebRequestData _queuedWebRequest in _queuedWebRequests)
             {
                 _runningCoRoutines.Add(new CoRoutineInfo(
                     "MakeWebRequestCoRoutine",
@@ -185,13 +185,13 @@ internal class MixerInteractiveHelper: MonoBehaviour
 
     private void Initialize()
     {
-        _queuedWebRequests = new List<InteractiveWebRequestData>();
+        _queuedWebRequests = new List<_InteractiveWebRequestData>();
         _queuedStartTimerRequests = new List<InteractiveTimerData>();
         _queuedStopTimerRequests = new List<InteractiveTimerType>();
         _runningCoRoutines = new List<CoRoutineInfo>();
     }
 
-    internal void MakeWebRequest(
+    internal void _MakeWebRequest(
         string requestID,
         string requestUrl,
         Dictionary<string, string> headers = null,
@@ -199,7 +199,7 @@ internal class MixerInteractiveHelper: MonoBehaviour
         string postData = ""
         )
     {
-        _queuedWebRequests.Add(new InteractiveWebRequestData(
+        _queuedWebRequests.Add(new _InteractiveWebRequestData(
             requestID,
             requestUrl,
             headers,
@@ -208,14 +208,14 @@ internal class MixerInteractiveHelper: MonoBehaviour
         ));
     }
 
-    internal struct InteractiveWebRequestData
+    internal struct _InteractiveWebRequestData
     {
         public string requestID;
         public string requestUrl;
         public Dictionary<string, string> headers;
         public string httpVerb;
         public string postData;
-        public InteractiveWebRequestData(
+        public _InteractiveWebRequestData(
             string newRequestID, 
             string newRequestUrl, 
             Dictionary<string, string> newHeaders, 
@@ -231,7 +231,7 @@ internal class MixerInteractiveHelper: MonoBehaviour
         }
     }
 
-    internal class InternalWebRequestStateChangedEventArgs
+    internal class _InternalWebRequestStateChangedEventArgs
     {
         public string RequestID
         {
@@ -259,7 +259,7 @@ internal class MixerInteractiveHelper: MonoBehaviour
             private set;
         }
 
-        internal InternalWebRequestStateChangedEventArgs(
+        internal _InternalWebRequestStateChangedEventArgs(
             string requestID,
             bool succeeded,
             long responseCode,
@@ -371,7 +371,7 @@ internal class MixerInteractiveHelper: MonoBehaviour
         BackgroundWorker backgroundWorker = new BackgroundWorker();
         backgroundWorker.DoWork -= WebRequestBackgroundWorkerDoWork;
         backgroundWorker.DoWork += WebRequestBackgroundWorkerDoWork;
-        backgroundWorker.RunWorkerAsync(new InternalWebRequestStateChangedEventArgs(
+        backgroundWorker.RunWorkerAsync(new _InternalWebRequestStateChangedEventArgs(
                 requestID,
                 !request.isNetworkError,
                 request.responseCode,
@@ -387,7 +387,7 @@ internal class MixerInteractiveHelper: MonoBehaviour
         if (backgroundWorker != null)
         {
             backgroundWorker.DoWork -= WebRequestBackgroundWorkerDoWork;
-            InternalWebRequestStateChangedEventArgs eventArgs = e.Argument as InternalWebRequestStateChangedEventArgs;
+            _InternalWebRequestStateChangedEventArgs eventArgs = e.Argument as _InternalWebRequestStateChangedEventArgs;
             if (eventArgs != null &&
                 OnInternalWebRequestStateChanged != null)
             {

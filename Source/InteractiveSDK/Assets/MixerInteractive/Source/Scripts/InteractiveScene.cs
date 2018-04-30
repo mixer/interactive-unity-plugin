@@ -55,7 +55,7 @@ namespace Microsoft.Mixer
                 List<InteractiveButtonControl> allButtons = InteractivityManager.SingletonInstance.Buttons as List<InteractiveButtonControl>;
                 foreach (InteractiveButtonControl button in allButtons)
                 {
-                    if (button.SceneID == SceneID)
+                    if (button._sceneID == SceneID)
                     {
                         buttonsInScene.Add(button);
                     }
@@ -75,7 +75,7 @@ namespace Microsoft.Mixer
                 List<InteractiveJoystickControl> allJoysticks = InteractivityManager.SingletonInstance.Joysticks as List<InteractiveJoystickControl>;
                 foreach (InteractiveJoystickControl joystick in allJoysticks)
                 {
-                    if (joystick.SceneID == SceneID)
+                    if (joystick._sceneID == SceneID)
                     {
                         joysticksInScene.Add(joystick);
                     }
@@ -120,12 +120,12 @@ namespace Microsoft.Mixer
             return InteractivityManager.SingletonInstance.GetJoystick(controlID);
         }
 
-        internal string etag;
+        internal string _etag;
 
         internal InteractiveScene(string sceneID = "", string newEtag = "")
         {
             SceneID = sceneID;
-            etag = newEtag;
+            _etag = newEtag;
         }
     }
 }

@@ -61,7 +61,7 @@ namespace Microsoft.Mixer
                 List<InteractiveParticipant> allParticipants = InteractivityManager.SingletonInstance.Participants as List<InteractiveParticipant>;
                 foreach (InteractiveParticipant participant in allParticipants)
                 {
-                    if (participant.groupID == GroupID)
+                    if (participant._groupID == GroupID)
                     {
                         participantsInGroup.Add(participant);
                     }
@@ -85,10 +85,10 @@ namespace Microsoft.Mixer
         public void SetScene(string sceneID)
         {
             SceneID = sceneID;
-            InteractivityManager.SingletonInstance.SetCurrentSceneInternal(this, sceneID);
+            InteractivityManager.SingletonInstance._SetCurrentSceneInternal(this, sceneID);
         }
 
-        internal string etag;
+        internal string _etag;
 
         /// <summary>
         /// Function to construct a InteractiveGroup object.
@@ -102,7 +102,7 @@ namespace Microsoft.Mixer
             }
 
             GroupID = groupID;
-            InteractivityManager.SingletonInstance.SendCreateGroupsMessage(GroupID, InteractivityManager.WS_MESSAGE_VALUE_DEFAULT_SCENE_ID);
+            InteractivityManager.SingletonInstance._SendCreateGroupsMessage(GroupID, InteractivityManager._WS_MESSAGE_VALUE_DEFAULT_SCENE_ID);
         }
 
         /// <summary>
@@ -118,12 +118,12 @@ namespace Microsoft.Mixer
 
             GroupID = groupID;
             SceneID = sceneID;
-            InteractivityManager.SingletonInstance.SendCreateGroupsMessage(GroupID, SceneID);
+            InteractivityManager.SingletonInstance._SendCreateGroupsMessage(GroupID, SceneID);
         }
 
         internal InteractiveGroup(string newEtag, string sceneID, string groupID)
         {
-            etag = newEtag;
+            _etag = newEtag;
             SceneID = sceneID;
             GroupID = groupID;
         }

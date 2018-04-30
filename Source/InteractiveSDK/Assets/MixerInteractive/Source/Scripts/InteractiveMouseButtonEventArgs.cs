@@ -1,4 +1,6 @@
-﻿namespace Microsoft.Mixer
+﻿using UnityEngine;
+
+namespace Microsoft.Mixer
 {
     public class InteractiveMouseButtonEventArgs : InteractiveEventArgs
     {
@@ -20,14 +22,22 @@
             private set;
         }
 
+        public Vector3 Position
+        {
+            get;
+            private set;
+        }
+
         internal InteractiveMouseButtonEventArgs(
             string id,
             InteractiveParticipant participant,
-            bool isPressed) : base(InteractiveEventType.MouseButton)
+            bool isPressed,
+            Vector3 position) : base(InteractiveEventType.MouseButton)
         {
             ControlID = id;
             Participant = participant;
             IsPressed = isPressed;
+            Position = position;
         }
     }
 }
