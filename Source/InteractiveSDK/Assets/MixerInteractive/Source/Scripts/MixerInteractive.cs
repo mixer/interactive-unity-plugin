@@ -400,6 +400,7 @@ public class MixerInteractive : MonoBehaviour
 
     private static void SerializeSyncVars()
     {
+#if !UNITY_WSA
         // Get all syncvars
         MonoBehaviour[] activeBehaviors = GameObject.FindObjectsOfType<MonoBehaviour>();
         foreach (MonoBehaviour monoBehavior in activeBehaviors)
@@ -423,6 +424,7 @@ public class MixerInteractive : MonoBehaviour
                 }
             }
         }
+#endif
     }
 
     private static void ParseAndSendCustomMessage(string name, string value)

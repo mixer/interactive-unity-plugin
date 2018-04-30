@@ -850,7 +850,7 @@ namespace Microsoft.Mixer
             }
             catch (Exception ex)
             {
-                LogError("Error: " + ex.Message);
+                _LogError("Error: " + ex.Message);
             }
 #elif UNITY_XBOXONE && !UNITY_EDITOR
             Dictionary<string, string> headers = new Dictionary<string, string>();
