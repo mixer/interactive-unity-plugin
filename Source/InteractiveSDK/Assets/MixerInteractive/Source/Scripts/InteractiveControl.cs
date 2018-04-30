@@ -22,6 +22,8 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
+using System.Collections.Generic;
+
 namespace Microsoft.Mixer
 {
     /// Base class for Interactivity controls. All controls are created and 
@@ -59,10 +61,19 @@ namespace Microsoft.Mixer
             private set;
         }
 
-        internal string ETag;
-        internal string SceneID;
-        internal string Kind;
-        internal InteractiveEventType Type;
+        /// <summary>
+        /// Returns a read only dictionary of name, value pairs for the control's metadata.
+        /// </summary>
+        public IDictionary<string, object> MetaProperties
+        {
+            get;
+            private set;
+        }
+
+        internal string _eTag;
+        internal string _sceneID;
+        internal string _kind;
+        internal InteractiveEventType _type;
         internal int participantID;
 
         /// <summary>
@@ -72,9 +83,9 @@ namespace Microsoft.Mixer
         public void SetDisabled(bool disabled)
         {
             Disabled = disabled;
-            InteractivityManager.SingletonInstance.SendSetButtonControlProperties(
+            InteractivityManager.SingletonInstance._SendSetButtonControlProperties(
                 ControlID, 
-                InteractivityManager.WS_MESSAGE_VALUE_DISABLED, 
+                InteractivityManager._WS_MESSAGE_VALUE_DISABLED, 
                 disabled,
                 0,
                 string.Empty,
@@ -89,28 +100,28 @@ namespace Microsoft.Mixer
         public void SetProperty(InteractiveControlProperty name, bool value)
         {
             SetPropertyImpl(
-                InteractivityManager.SingletonInstance.InteractiveControlPropertyToString(name),
+                InteractivityManager.SingletonInstance._InteractiveControlPropertyToString(name),
                 value
                 );
         }
         public void SetProperty(InteractiveControlProperty name, double value)
         {
             SetPropertyImpl(
-                InteractivityManager.SingletonInstance.InteractiveControlPropertyToString(name),
+                InteractivityManager.SingletonInstance._InteractiveControlPropertyToString(name),
                 value
                 );
         }
         public void SetProperty(InteractiveControlProperty name, string value)
         {
             SetPropertyImpl(
-                InteractivityManager.SingletonInstance.InteractiveControlPropertyToString(name),
+                InteractivityManager.SingletonInstance._InteractiveControlPropertyToString(name),
                 value
                 );
         }
         public void SetProperty(InteractiveControlProperty name, object value)
         {
             SetPropertyImpl(
-                InteractivityManager.SingletonInstance.InteractiveControlPropertyToString(name),
+                InteractivityManager.SingletonInstance._InteractiveControlPropertyToString(name), 
                 value
                 );
         }
@@ -139,31 +150,32 @@ namespace Microsoft.Mixer
 
         private void SetPropertyImpl(string name, bool value)
         {
-            InteractivityManager.SingletonInstance._QueuePropertyUpdate(SceneID, ControlID, name, value);
+            InteractivityManager.SingletonInstance._QueuePropertyUpdate(_sceneID, ControlID, name, value);
         }
         private void SetPropertyImpl(string name, double value)
         {
-            InteractivityManager.SingletonInstance._QueuePropertyUpdate(SceneID, ControlID, name, value);
+            InteractivityManager.SingletonInstance._QueuePropertyUpdate(_sceneID, ControlID, name, value);
         }
         private void SetPropertyImpl(string name, string value)
         {
-            InteractivityManager.SingletonInstance._QueuePropertyUpdate(SceneID, ControlID, name, value);
+            InteractivityManager.SingletonInstance._QueuePropertyUpdate(_sceneID, ControlID, name, value);
         }
         private void SetPropertyImpl(string name, object value)
         {
-            InteractivityManager.SingletonInstance._QueuePropertyUpdate(SceneID, ControlID, name, value);
+            InteractivityManager.SingletonInstance._QueuePropertyUpdate(_sceneID, ControlID, name, value);
         }
 
-        internal InteractiveControl(string controlID, string kind, InteractiveEventType type, bool disabled, string helpText, string eTag, string sceneID)
+        internal InteractiveControl(string controlID, string kind, InteractiveEventType type, bool disabled, string helpText, string eTag, string sceneID, Dictionary<string, object> metaProperties)
         {
             ControlID = controlID;
-            Kind = kind;
-            Type = type;
+            _kind = kind;
+            _type = type;
             Disabled = disabled;
             HelpText = helpText;
-            ETag = eTag;
-            SceneID = sceneID;
+            _eTag = eTag;
+            _sceneID = sceneID;
             participantID = -1;
+            MetaProperties = metaProperties;
         }
     }
 }

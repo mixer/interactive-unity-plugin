@@ -31,18 +31,22 @@ using Microsoft.Mixer;
 using UnityEngine.Networking;
 using System.Collections;
 using System;
+using System.Reflection;
 using Microsoft;
 #if UNITY_WSA && !UNITY_EDITOR
 using Windows.UI.Core;
 using Windows.ApplicationModel.Core;
+using System;
 using Windows.Security.Credentials;
 using Windows.Security.Authentication.Web.Core;
 using System.Threading.Tasks;
 #endif
 #if UNITY_XBOXONE && !UNITY_EDITOR
+using System;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.IO;
+using System.Collections;
 #endif
 
 public class MixerInteractive : MonoBehaviour
@@ -74,6 +78,12 @@ public class MixerInteractive : MonoBehaviour
     public delegate void OnInteractiveJoystickControlEventHandler(object sender, InteractiveJoystickEventArgs e);
     public static event OnInteractiveJoystickControlEventHandler OnInteractiveJoystickControlEvent;
 
+    public delegate void OnInteractiveMouseButtonEventHandler(object sender, InteractiveMouseButtonEventArgs e);
+    public static event OnInteractiveMouseButtonEventHandler OnInteractiveMouseButtonEvent;
+
+    public delegate void OnInteractiveCoordinatesChangedHandler(object sender, InteractiveCoordinatesChangedEventArgs e);
+    public static event OnInteractiveCoordinatesChangedHandler OnInteractiveCoordinatesChangedEvent;
+
     public delegate void OnInteractiveTextControlEventHandler(object sender, InteractiveTextEventArgs e);
     public static event OnInteractiveTextControlEventHandler OnInteractiveTextControlEvent;
 
@@ -93,7 +103,15 @@ public class MixerInteractive : MonoBehaviour
     private static bool hasFiredGoInteractiveEvent;
     private static bool shouldCheckForOutstandingRequests;
 
-    internal static Websocket websocket;
+    // Custom controls
+    public GameObject addNewRpcMethodSource;
+    // Unity doesn't handle serialization of dictionaries easily
+    // so we keep 2 lists of strings instead.
+    public List<string> rpcOwningMonoBehaviorNames;
+    public List<string> rpcMethodNames;
+
+    private static List<string> outboundMessages;
+    internal static Websocket _websocket;
 
 #if !UNITY_WSA || UNITY_EDITOR
     private static BackgroundWorker backgroundWorker;
@@ -101,6 +119,7 @@ public class MixerInteractive : MonoBehaviour
 
     private const string DEFAULT_GROUP_ID = "default";
     private const float CHECK_FOR_OUTSTANDING_REQUESTS_INTERVAL = 1f;
+    internal const float _DEFAULT_MIXER_SYNCVAR_UPDATE_INTERVAL = 1f;
 
     void Awake()
     {
@@ -137,6 +156,8 @@ public class MixerInteractive : MonoBehaviour
             interactivityManager.OnParticipantStateChanged -= HandleParticipantStateChanged;
             interactivityManager.OnInteractiveButtonEvent -= HandleInteractiveButtonEvent;
             interactivityManager.OnInteractiveJoystickControlEvent -= HandleInteractiveJoystickControlEvent;
+            interactivityManager.OnInteractiveMouseButtonEvent -= HandleInteractiveMouseButtonEvent;
+            interactivityManager.OnInteractiveCoordinatesChangedEvent -= HandleInteractiveCoordinatesChangedHandler;
             interactivityManager.OnInteractiveTextControlEvent -= HandleInteractiveTextControlEvent;
             interactivityManager.OnInteractiveMessageEvent -= HandleInteractiveMessageEvent;
 
@@ -144,6 +165,8 @@ public class MixerInteractive : MonoBehaviour
             interactivityManager.OnInteractivityStateChanged += HandleInteractivityStateChanged;
             interactivityManager.OnParticipantStateChanged += HandleParticipantStateChanged;
             interactivityManager.OnInteractiveButtonEvent += HandleInteractiveButtonEvent;
+            interactivityManager.OnInteractiveMouseButtonEvent += HandleInteractiveMouseButtonEvent;
+            interactivityManager.OnInteractiveCoordinatesChangedEvent += HandleInteractiveCoordinatesChangedHandler;
             interactivityManager.OnInteractiveJoystickControlEvent += HandleInteractiveJoystickControlEvent;
             interactivityManager.OnInteractiveTextControlEvent += HandleInteractiveTextControlEvent; 
             interactivityManager.OnInteractiveMessageEvent += HandleInteractiveMessageEvent;
@@ -152,16 +175,16 @@ public class MixerInteractive : MonoBehaviour
         {
             interactivityManagerAlreadyInitialized = true;
         }
-        MixerInteractiveHelper helper = MixerInteractiveHelper.SingletonInstance;
-        helper.runInBackgroundIfInteractive = runInBackground;
-        helper.defaultSceneID = defaultSceneID;
+        MixerInteractiveHelper helper = MixerInteractiveHelper._SingletonInstance;
+        helper._runInBackgroundIfInteractive = runInBackground;
+        helper._defaultSceneID = defaultSceneID;
         for (int i = 0; i < groupIDs.Count; i++)
         {
             string groupID = groupIDs[i];
             if (groupID != string.Empty &&
-                !helper.groupSceneMapping.ContainsKey(groupID))
+                !helper._groupSceneMapping.ContainsKey(groupID))
             {
-                helper.groupSceneMapping.Add(groupID, sceneIDs[i]);
+                helper._groupSceneMapping.Add(groupID, sceneIDs[i]);
             }
         }
 
@@ -174,6 +197,7 @@ public class MixerInteractive : MonoBehaviour
         outstandingRequestsCompleted = false;
         shouldCheckForOutstandingRequests = false;
         lastCheckForOutstandingRequestsTime = -1;
+        outboundMessages = new List<string>();
 #if !UNITY_WSA
         backgroundWorker = new BackgroundWorker();
 #endif
@@ -182,11 +206,21 @@ public class MixerInteractive : MonoBehaviour
         {
             ProcessSerializedProperties();
         }
-        websocket = gameObject.AddComponent<Websocket>();
-        InteractivityManager.SingletonInstance.SetWebsocketInstance(websocket);
+        _websocket = gameObject.AddComponent<Websocket>();
+        InteractivityManager.SingletonInstance.SetWebsocketInstance(_websocket);
     }
 
     private static void HandleInteractiveJoystickControlEvent(object sender, InteractiveJoystickEventArgs e)
+    {
+        queuedEvents.Add(e);
+    }
+
+    private static void HandleInteractiveMouseButtonEvent(object sender, InteractiveMouseButtonEventArgs e)
+    {
+        queuedEvents.Add(e);
+    }
+
+    private static void HandleInteractiveCoordinatesChangedHandler(object sender, InteractiveCoordinatesChangedEventArgs e)
     {
         queuedEvents.Add(e);
     }
@@ -219,6 +253,200 @@ public class MixerInteractive : MonoBehaviour
     private static void HandleInteractiveMessageEvent(object sender, InteractiveEventArgs e)
     {
         queuedEvents.Add(e);
+    }
+
+    // Called when a remote RPC messages is sent
+    internal static void InvokeRpcMethod(string methodName, List<MixerHelperParameterInfo> mixerParameterInfos)
+    {
+        // See if we can find the method. If not, refresh the method cache and try again.
+        bool methodFound = FindAndInvokeRpcMethod(methodName, mixerParameterInfos);
+        if (!methodFound)
+        {
+            RefreshRPCMethods();
+            FindAndInvokeRpcMethod(methodName, mixerParameterInfos);
+        }
+    }
+
+    private static bool FindAndInvokeRpcMethod(string methodName, List<MixerHelperParameterInfo> mixerParameterInfos)
+    {
+        bool found = false;
+        RpcCachedMethodInfo rpcCachedMethodInfo = new RpcCachedMethodInfo();
+        var helper = MixerInteractiveHelper._SingletonInstance;
+        if (helper.cachedRPCMethods.TryGetValue(methodName, out rpcCachedMethodInfo))
+        {
+            // Invoke the function
+            MethodInfo methodInfo = rpcCachedMethodInfo.methodInfo;
+            ParameterInfo[] parametersInfo = methodInfo.GetParameters();
+            object[] methodParameters = new object[parametersInfo.Length];
+            for (int i = 0; i < parametersInfo.Length; i++)
+            {
+                ParameterInfo parameterInfo = parametersInfo[i];
+                string parameterAsString = mixerParameterInfos[i].typeValue;
+                methodParameters[i] = Convert.ChangeType(parameterAsString, parameterInfo.ParameterType);
+            }
+
+            found = true;
+            try
+            {
+                methodInfo.Invoke((object)rpcCachedMethodInfo.owningMonoBehavior, methodParameters);
+            }
+            catch (Exception e)
+            {
+                Debug.Log("Error calling method " + rpcCachedMethodInfo.owningMonoBehavior.name + "." + methodInfo.Name + ". Details: " + e.Message);
+            }
+        }
+        return found;
+    }
+
+    public static void AddRpcMethodsFromTheEditor(GameObject owningGameObject, List<string> rpcMethodNames)
+    {
+        if (rpcMethodNames.Count == 0)
+        {
+            return;
+        }
+
+        var helper = MixerInteractiveHelper._SingletonInstance;
+        MonoBehaviour[] activeBehaviors = owningGameObject.GetComponents<MonoBehaviour>();
+        foreach (string rpcMethodName in rpcMethodNames)
+        {
+            string trimmedMethodName = TrimMethodName(rpcMethodName);
+            foreach (MonoBehaviour monoBehavior in activeBehaviors)
+            {
+                Type monoType = monoBehavior.GetType();
+                MethodInfo[] methods = monoType.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                foreach (MethodInfo method in methods)
+                {
+                    if (method.Name == trimmedMethodName)
+                    {
+                        if (!helper.cachedRPCMethods.ContainsKey(method.Name))
+                        {
+                            helper.cachedRPCMethods.Add(method.Name, new RpcCachedMethodInfo
+                            {
+                                owningMonoBehavior = monoBehavior,
+                                methodInfo = method
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    internal static string TrimMethodName(string unTrimmedMethodName)
+    {
+        return unTrimmedMethodName.Split('(')[0].Trim();
+    }
+
+    private static void RefreshRPCMethods(bool includeMethodsFromTheInspector = false)
+    {
+        // Add all methods with the "MixerRpcMethod" to our method cache.
+        var helper = MixerInteractiveHelper._SingletonInstance;
+        MonoBehaviour[] activeBehaviors = FindObjectsOfType<MonoBehaviour>();
+        foreach (MonoBehaviour monoBehavior in activeBehaviors)
+        {
+            Type monoType = monoBehavior.GetType();
+            MethodInfo[] methods = monoType.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            foreach (MethodInfo method in methods)
+            {
+                if (method.IsDefined(typeof(MixerRpcMethod), false))
+                {
+                    if (!helper.cachedRPCMethods.ContainsKey(method.Name))
+                    {
+                        helper.cachedRPCMethods.Add(method.Name, new RpcCachedMethodInfo
+                        {
+                            owningMonoBehavior = monoBehavior,
+                            methodInfo = method
+                        });
+                    }
+                }
+
+                // Check for inspector methods
+                if (includeMethodsFromTheInspector)
+                {
+                    string currentMonoBehaviorName = monoBehavior.name;
+                    for (int i = 0; i < helper.rpcOwningMonoBehaviorNames.Count; i++)
+                    {
+                        if (helper.rpcOwningMonoBehaviorNames[i] == currentMonoBehaviorName &&
+                            helper.rpcMethodNames[i] == method.Name)
+                        {
+                            if (!helper.cachedRPCMethods.ContainsKey(method.Name))
+                            {
+                                helper.cachedRPCMethods.Add(method.Name, new RpcCachedMethodInfo
+                                {
+                                    owningMonoBehavior = monoBehavior,
+                                    methodInfo = method
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    public static void FlushUpdates()
+    {
+        // Send all the outbound messages regardless of time.
+        SendOutboundMessages();
+    }
+
+    internal static void SendOutboundMessages()
+    {
+        foreach (string message in outboundMessages)
+        {
+            InteractivityManager.SingletonInstance.SendMessage(message);
+        }
+    }
+
+    private static void SerializeSyncVars()
+    {
+#if !UNITY_WSA
+        // Get all syncvars
+        MonoBehaviour[] activeBehaviors = GameObject.FindObjectsOfType<MonoBehaviour>();
+        foreach (MonoBehaviour monoBehavior in activeBehaviors)
+        {
+            Type monoType = monoBehavior.GetType();
+
+            // Get the fields
+            FieldInfo[] behaviorFields = monoType.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.Instance);
+            foreach (FieldInfo field in behaviorFields)
+            {
+                MixerSyncVar attribute = Attribute.GetCustomAttribute(field, typeof(MixerSyncVar)) as MixerSyncVar;
+                if (attribute != null)
+                {
+                    object valueAsObject = field.GetValue(monoBehavior);
+                    string valueAsString = string.Empty;
+                    if (valueAsObject != null)
+                    {
+                        valueAsString = valueAsObject.ToString();
+                    }
+                    ParseAndSendCustomMessage(field.Name, valueAsString);
+                }
+            }
+        }
+#endif
+    }
+
+    private static void ParseAndSendCustomMessage(string name, string value)
+    {
+        InteractivityManager.SingletonInstance.SendMessage("{" +
+            "   name: " + name +
+            "   value: " + value +
+            "}");
+    }
+
+    internal static void QueueCustomMessage(string newMessage)
+    {
+        if (outboundMessages == null)
+        {
+            outboundMessages = new List<string>();
+        }
+        outboundMessages.Add(newMessage);
+    }
+
+    internal static int GetTimeSinceStartUpInMilliSeconds()
+    {
+        return (int)Time.realtimeSinceStartup * 1000;
     }
 
     /// <summary>
@@ -317,6 +545,34 @@ public class MixerInteractive : MonoBehaviour
     }
 
     /// <summary>
+    /// Returns the current mouse position in Unity's screen space.
+    /// </summary>
+    public static Vector3 MousePosition
+    {
+        get
+        {
+            Vector3 mousePosition = Vector3.zero;
+            if (InteractivityManager._mousePositionsByParticipant.Count > 0)
+            {
+                Dictionary<uint, Vector2> mousePositionsByParticipant = InteractivityManager._mousePositionsByParticipant;
+                var mousePositionByParticipantKeys = mousePositionsByParticipant.Keys;
+                float totalX = 0;
+                float totalY = 0;
+                foreach (var mousePositionByParticipantKey in mousePositionByParticipantKeys)
+                {
+                    totalX += mousePositionsByParticipant[mousePositionByParticipantKey].x;
+                    totalY += mousePositionsByParticipant[mousePositionByParticipantKey].y;
+                }
+                // We average all the mouse positions. Z in always zero.
+                mousePosition.x = totalX / mousePositionByParticipantKeys.Count;
+                mousePosition.y = totalY / mousePositionByParticipantKeys.Count;
+            }
+
+            return mousePosition;
+        }
+    }
+
+    /// <summary>
     /// The string the broadcaster needs to enter in the Mixer website to
     /// authorize the interactive session.
     /// </summary>
@@ -339,7 +595,7 @@ public class MixerInteractive : MonoBehaviour
     {
         // Find which participant send the input for the given control.
         InteractiveParticipant participant = null;
-        InternalParticipantTrackingState participantTrackingState = new InternalParticipantTrackingState();
+        _InternalParticipantTrackingState participantTrackingState = new _InternalParticipantTrackingState();
         bool participantTrackingStateEntryExists = InteractivityManager._participantsWhoTriggeredGiveInput.TryGetValue(controlID, out participantTrackingState);
         if (participantTrackingStateEntryExists)
         {
@@ -412,7 +668,7 @@ public class MixerInteractive : MonoBehaviour
     {
         InteractivityManager.SingletonInstance.StopInteractive();
         pendingGoInteractive = false;
-        if (MixerInteractiveHelper.SingletonInstance.runInBackgroundIfInteractive)
+        if (MixerInteractiveHelper._SingletonInstance._runInBackgroundIfInteractive)
         {
             Application.runInBackground = previousRunInBackgroundValue;
         }
@@ -426,6 +682,9 @@ public class MixerInteractive : MonoBehaviour
     public static void DoWork()
     {
         InteractivityManager.SingletonInstance.DoWork();
+
+        // Send any outstanding custom controls messages that are queued.
+        SendOutboundMessages();
     }
 
     /// <summary>
@@ -486,7 +745,7 @@ public class MixerInteractive : MonoBehaviour
             outstandingRequestsCompleted = CheckForOutStandingRequestsCompleted();
         }
 
-        InteractivityManager.SingletonInstance.DoWork();
+        DoWork();
 
         List<InteractiveEventArgs> processedEvents = new List<InteractiveEventArgs>();
         if (queuedEvents != null)
@@ -539,6 +798,20 @@ public class MixerInteractive : MonoBehaviour
                         if (OnInteractiveJoystickControlEvent != null)
                         {
                             OnInteractiveJoystickControlEvent(this, interactiveEvent as InteractiveJoystickEventArgs);
+                        }
+                        processedEvents.Add(interactiveEvent);
+                        break;
+                    case InteractiveEventType.MouseButton:
+                        if (OnInteractiveMouseButtonEvent != null)
+                        {
+                            OnInteractiveMouseButtonEvent(this, interactiveEvent as InteractiveMouseButtonEventArgs);
+                        }
+                        processedEvents.Add(interactiveEvent);
+                        break;
+                    case InteractiveEventType.Coordinates:
+                        if (OnInteractiveCoordinatesChangedEvent != null)
+                        {
+                            OnInteractiveCoordinatesChangedEvent(this, interactiveEvent as InteractiveCoordinatesChangedEventArgs);
                         }
                         processedEvents.Add(interactiveEvent);
                         break;
@@ -683,6 +956,75 @@ public class MixerInteractive : MonoBehaviour
     }
 
     /// <summary>
+    /// Returns whether the mouse button down event occured.
+    /// </summary>
+    /// <param name="buttonIndex">
+    /// The index of the mouse button. Only 1 value is supported right now
+    /// which is 0. 0 corresponds to the left mouse button.
+    /// </param>
+    public static bool GetMouseButtonDown(int buttonIndex = 0)
+    {
+        bool getButtonDownResult = false;
+        Dictionary<uint, _InternalMouseButtonState> mouseButtonStateByParticipant = InteractivityManager._mouseButtonStateByParticipant;
+        var mouseButtonStateByParticipantKeys = mouseButtonStateByParticipant.Keys;
+        foreach (uint mouseButtonStateByParticipantKey in mouseButtonStateByParticipantKeys)
+        {
+            if (mouseButtonStateByParticipant[mouseButtonStateByParticipantKey].IsDown)
+            {
+                getButtonDownResult = true;
+                break;
+            }
+        }
+        return getButtonDownResult;
+    }
+
+    /// <summary>
+    /// Returns whether the mouse button is currently pressed.
+    /// </summary>
+    /// <param name="buttonIndex">
+    /// The index of the mouse button. Only 1 value is supported right now
+    /// which is 0. 0 corresponds to the left mouse button.
+    /// </param>
+    public static bool GetMouseButton(int buttonIndex = 0)
+    {
+        bool getButtonDownResult = false;
+        Dictionary<uint, _InternalMouseButtonState> mouseButtonStateByParticipant = InteractivityManager._mouseButtonStateByParticipant;
+        var mouseButtonStateByParticipantKeys = mouseButtonStateByParticipant.Keys;
+        foreach (uint mouseButtonStateByParticipantKey in mouseButtonStateByParticipantKeys)
+        {
+            if (mouseButtonStateByParticipant[mouseButtonStateByParticipantKey].IsPressed)
+            {
+                getButtonDownResult = true;
+                break;
+            }
+        }
+        return getButtonDownResult;
+    }
+
+    /// <summary>
+    /// Returns whether the mouse button up event occured.
+    /// </summary>
+    /// <param name="buttonIndex">
+    /// The index of the mouse button. Only 1 value is supported right now
+    /// which is 0. 0 corresponds to the left mouse button.
+    /// </param>
+    public static bool GetMouseButtonUp(int buttonIndex = 0)
+    {
+        bool getButtonDownResult = false;
+        Dictionary<uint, _InternalMouseButtonState> mouseButtonStateByParticipant = InteractivityManager._mouseButtonStateByParticipant;
+        var mouseButtonStateByParticipantKeys = mouseButtonStateByParticipant.Keys;
+        foreach (uint mouseButtonStateByParticipantKey in mouseButtonStateByParticipantKeys)
+        {
+            if (mouseButtonStateByParticipant[mouseButtonStateByParticipantKey].IsUp)
+            {
+                getButtonDownResult = true;
+                break;
+            }
+        }
+        return getButtonDownResult;
+    }
+
+    /// <summary>
     /// Gets a button control object by ID.
     /// </summary>
     /// <param name="controlID">The ID of the control.</param>
@@ -784,7 +1126,7 @@ public class MixerInteractive : MonoBehaviour
     /// <returns>Returns the interactive control matching the given ID.</returns>
     public static InteractiveControl GetControl(string controlID)
     {
-        return InteractivityManager.SingletonInstance.GetControl(controlID);
+        return InteractivityManager.SingletonInstance._GetControl(controlID);
     }
 
     /// <summary>
@@ -794,7 +1136,7 @@ public class MixerInteractive : MonoBehaviour
     /// <returns>Returns a list of InteractiveTextResult objects. Returns an empty list if there was no input.</returns>
     public static IList<InteractiveTextResult> GetText(string controlID)
     {
-        return InteractivityManager.SingletonInstance.GetText(controlID);
+        return InteractivityManager.SingletonInstance._GetText(controlID);
     }
 
     /// <summary>
@@ -832,7 +1174,7 @@ public class MixerInteractive : MonoBehaviour
         backgroundWorker.RunWorkerAsync();
 #endif
 
-        if (MixerInteractiveHelper.SingletonInstance.runInBackgroundIfInteractive)
+        if (MixerInteractiveHelper._SingletonInstance._runInBackgroundIfInteractive)
         {
             previousRunInBackgroundValue = Application.runInBackground;
             Application.runInBackground = true;
@@ -883,17 +1225,17 @@ public class MixerInteractive : MonoBehaviour
 
     private static void ProcessSerializedProperties()
     {
-        MixerInteractiveHelper helper = MixerInteractiveHelper.SingletonInstance;
+        MixerInteractiveHelper helper = MixerInteractiveHelper._SingletonInstance;
         InteractivityManager interactivityManager = InteractivityManager.SingletonInstance;
-        string defaultSceneID = helper.defaultSceneID;
-        if (helper.groupSceneMapping.Count > 0 ||
+        string defaultSceneID = helper._defaultSceneID;
+        if (helper._groupSceneMapping.Count > 0 ||
             defaultSceneID != string.Empty)
         {
             shouldCheckForOutstandingRequests = true;
         }
-        if (helper.groupSceneMapping.Count > 0)
+        if (helper._groupSceneMapping.Count > 0)
         {
-            var groupIDs = helper.groupSceneMapping.Keys;
+            var groupIDs = helper._groupSceneMapping.Keys;
             foreach (var groupID in groupIDs)
             {
                 if (groupID == string.Empty)
@@ -905,7 +1247,7 @@ public class MixerInteractive : MonoBehaviour
 #pragma warning disable 0219
                 InteractiveGroup group;
 #pragma warning restore 0219
-                string sceneID = helper.groupSceneMapping[groupID];
+                string sceneID = helper._groupSceneMapping[groupID];
                 if (sceneID != string.Empty)
                 {
                     group = new InteractiveGroup(groupID, sceneID);
@@ -1093,4 +1435,39 @@ public class MixerInteractive : MonoBehaviour
     {
         StopInteractive();
     }
+
+    // Custom controls
+    public class RpcCachedMethodInfo
+    {
+        public MonoBehaviour owningMonoBehavior;
+        public MethodInfo methodInfo;
+    }
+
+    public class ObservedCachedFieldInfo
+    {
+        public FieldInfo fieldInfo;
+        public object owningObject;
+        public float updateInterval;
+        public float lastSendTime;
+        public string previousValueAsString;
+    }
+
+    public struct MixerHelperParameterInfo
+    {
+        public string typeName;
+        public string typeValue;
+    }
 }
+
+[AttributeUsage(AttributeTargets.Field)]
+public class MixerSyncVar : Attribute
+{
+    public float updateInterval;
+    public MixerSyncVar(double newUpdateInterval = MixerInteractive._DEFAULT_MIXER_SYNCVAR_UPDATE_INTERVAL)
+    {
+        updateInterval = (float)newUpdateInterval;
+    }
+}
+
+[AttributeUsage(AttributeTargets.Method)]
+public class MixerRpcMethod : Attribute { }

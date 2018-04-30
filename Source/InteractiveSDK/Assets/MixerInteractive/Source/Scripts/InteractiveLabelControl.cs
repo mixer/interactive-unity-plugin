@@ -53,13 +53,13 @@ namespace Microsoft.Mixer
         {
             InteractivityManager interactivityManager = InteractivityManager.SingletonInstance;
             interactivityManager._QueuePropertyUpdate(
-                SceneID, 
+                _sceneID, 
                 ControlID,
-                interactivityManager.InteractiveControlPropertyToString(InteractiveControlProperty.Text), 
+                interactivityManager._InteractiveControlPropertyToString(InteractiveControlProperty.Text), 
                 text);
         }
 
-        public InteractiveLabelControl(string controlID, string text, string sceneID) : base(controlID, InteractivityManager.CONTROL_KIND_LABEL, InteractiveEventType.Unknown, false, "", "", sceneID)
+        public InteractiveLabelControl(string controlID, string text, string sceneID) : base(controlID, InteractivityManager._CONTROL_KIND_LABEL, InteractiveEventType.Unknown, false, "", "", sceneID, new Dictionary<string, object>())
         {
             Text = text;
         }
