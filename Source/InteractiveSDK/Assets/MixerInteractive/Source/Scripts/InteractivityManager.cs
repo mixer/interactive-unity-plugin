@@ -1158,7 +1158,7 @@ namespace Microsoft.Mixer
                 jsonWriter.WriteEnd();
                 SendJsonString(stringWriter.ToString());
             }
-            _outstandingMessages.Add(messageID, WS_MESSAGE_METHOD_UPDATE_CONTROLS);
+            StoreIfExpectingReply(messageID, WS_MESSAGE_METHOD_UPDATE_CONTROLS);
         }
 
         /// <summary>
@@ -1200,7 +1200,7 @@ namespace Microsoft.Mixer
                 jsonWriter.WriteEnd();
                 SendJsonString(stringWriter.ToString());
             }
-            _outstandingMessages.Add(messageID, messageType);
+            StoreIfExpectingReply(messageID, messageType);
         }
 
         /// <summary>
@@ -1391,7 +1391,7 @@ namespace Microsoft.Mixer
                     jsonWriter.WriteEnd();
                     SendJsonString(stringWriter.ToString());
                 }
-                _outstandingMessages.Add(messageID, WS_MESSAGE_METHOD_UPDATE_CONTROLS);
+                StoreIfExpectingReply(messageID, WS_MESSAGE_METHOD_UPDATE_CONTROLS);
             }
             _queuedControlPropertyUpdates.Clear();
         }
@@ -3106,7 +3106,7 @@ namespace Microsoft.Mixer
                 jsonWriter.WriteEnd();
                 SendJsonString(stringWriter.ToString());
             }
-            _outstandingMessages.Add(messageID, WS_MESSAGE_METHOD_READY);
+            StoreIfExpectingReply(messageID, WS_MESSAGE_METHOD_READY);
         }
 
         internal void _SendCaptureTransactionMessage(string transactionID)
@@ -3131,7 +3131,7 @@ namespace Microsoft.Mixer
                 jsonWriter.WriteEnd();
                 SendJsonString(stringWriter.ToString());
             }
-            _outstandingMessages.Add(messageID, WS_MESSAGE_METHOD_SET_CAPTURE_TRANSACTION);
+            StoreIfExpectingReply(messageID, WS_MESSAGE_METHOD_SET_CAPTURE_TRANSACTION);
         }
 
         internal void _SendCreateGroupsMessage(string groupID, string sceneID)
@@ -3163,7 +3163,7 @@ namespace Microsoft.Mixer
                 jsonWriter.WriteEnd();
                 SendJsonString(stringWriter.ToString());
             }
-            _outstandingMessages.Add(messageID, WS_MESSAGE_METHOD_SET_CURRENT_SCENE);
+            StoreIfExpectingReply(messageID, WS_MESSAGE_METHOD_SET_CURRENT_SCENE);
         }
 
         internal void _SendSetUpdateGroupsMessage(string groupID, string sceneID, string groupEtag)
@@ -3197,7 +3197,7 @@ namespace Microsoft.Mixer
                 jsonWriter.WriteEnd();
                 SendJsonString(stringWriter.ToString());
             }
-            _outstandingMessages.Add(messageID, WS_MESSAGE_METHOD_SET_CURRENT_SCENE);
+            StoreIfExpectingReply(messageID, WS_MESSAGE_METHOD_SET_CURRENT_SCENE);
         }
 
         internal void _SendSetUpdateScenesMessage(InteractiveScene scene)
@@ -3229,7 +3229,7 @@ namespace Microsoft.Mixer
                 jsonWriter.WriteEnd();
                 SendJsonString(stringWriter.ToString());
             }
-            _outstandingMessages.Add(messageID, WS_MESSAGE_METHOD_SET_CURRENT_SCENE);
+            StoreIfExpectingReply(messageID, WS_MESSAGE_METHOD_SET_CURRENT_SCENE);
         }
 
         internal void _SendUpdateParticipantsMessage(InteractiveParticipant participant)
@@ -3263,7 +3263,7 @@ namespace Microsoft.Mixer
                 jsonWriter.WriteEnd();
                 SendJsonString(stringWriter.ToString());
             }
-            _outstandingMessages.Add(messageID, WS_MESSAGE_METHOD_UPDATE_PARTICIPANTS);
+            StoreIfExpectingReply(messageID, WS_MESSAGE_METHOD_UPDATE_PARTICIPANTS);
         }
 
         private void SendSetCompressionMessage()
@@ -3290,7 +3290,7 @@ namespace Microsoft.Mixer
                 jsonWriter.WriteEnd();
                 SendJsonString(stringWriter.ToString());
             }
-            _outstandingMessages.Add(messageID, WS_MESSAGE_METHOD_SET_COMPRESSION);
+            StoreIfExpectingReply(messageID, WS_MESSAGE_METHOD_SET_COMPRESSION);
         }
 
         internal void _SendSetJoystickSetCoordinates(string controlID, double x, double y)
@@ -3333,7 +3333,7 @@ namespace Microsoft.Mixer
                 jsonWriter.WriteEnd();
                 SendJsonString(stringWriter.ToString());
             }
-            _outstandingMessages.Add(messageID, WS_MESSAGE_METHOD_SET_JOYSTICK_COORDINATES);
+            StoreIfExpectingReply(messageID, WS_MESSAGE_METHOD_SET_JOYSTICK_COORDINATES);
         }
 
         internal void _SendSetButtonControlProperties(
@@ -3399,7 +3399,7 @@ namespace Microsoft.Mixer
                 jsonWriter.WriteEnd();
                 SendJsonString(stringWriter.ToString());
             }
-            _outstandingMessages.Add(messageID, WS_MESSAGE_METHOD_SET_BUTTON_CONTROL_PROPERTIES);
+            StoreIfExpectingReply(messageID, WS_MESSAGE_METHOD_SET_BUTTON_CONTROL_PROPERTIES);
         }
 
         private void SendGetAllGroupsMessage()
@@ -3446,7 +3446,7 @@ namespace Microsoft.Mixer
                     _LogError("Error: Unable to send message: " + method);
                 }
             }
-            _outstandingMessages.Add(messageID, method);
+            StoreIfExpectingReply(messageID, method);
         }
 
 #if UNITY_WSA && !UNITY_EDITOR
@@ -3466,6 +3466,21 @@ namespace Microsoft.Mixer
             _websocket.Send(jsonString);
 #endif
             _Log(jsonString);
+        }
+
+        // We don't add every message to this list because otherwise it will become unbounded
+        // and on performance critical platforms like consoles the size of the list can have an
+        // effect on game performance. So we have a wrapper function that checks if we need
+        // to add the message or not.
+        private void StoreIfExpectingReply(uint messageID, string messageType)
+        {
+            if (messageType != WS_MESSAGE_METHOD_GET_ALL_PARTICIPANTS ||
+                messageType != WS_MESSAGE_METHOD_GET_GROUPS ||
+                messageType != WS_MESSAGE_METHOD_GET_SCENES ||
+                messageType != WS_MESSAGE_METHOD_SET_CURRENT_SCENE)
+            {
+                _outstandingMessages.Add(messageID, messageType);
+            }
         }
 
         List<InteractiveEventArgs> _queuedEvents = new List<InteractiveEventArgs>();
