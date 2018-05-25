@@ -2183,7 +2183,7 @@ namespace Microsoft.Mixer
         {
             try
             {
-                while (jsonReader.Read() && jsonReader.TokenType != JsonToken.EndArray)
+                while (jsonReader.Read() && jsonReader.TokenType != JsonToken.Null && jsonReader.TokenType != JsonToken.EndArray)
                 {
                     if (jsonReader.TokenType == JsonToken.StartObject)
                     {
