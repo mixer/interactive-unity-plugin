@@ -221,13 +221,12 @@ namespace Microsoft.Mixer
         /// <param name="text">String to display on the button.</param>
         public void SetText(string text)
         {
-            InteractivityManager.SingletonInstance._SendSetButtonControlProperties(
+            InteractivityManager interactivityManager = InteractivityManager.SingletonInstance;
+            interactivityManager._QueuePropertyUpdate(
+                _sceneID,
                 ControlID,
-                InteractivityManager._WS_MESSAGE_KEY_TEXT,
-                false,
-                0,
-                text,
-                0);
+                interactivityManager._InteractiveControlPropertyToString(InteractiveControlProperty.Text),
+                text);
         }
 
         /// <summary>
