@@ -1989,7 +1989,7 @@ namespace Microsoft.Mixer
                 if (jsonReader.Value != null &&
                     jsonReader.Value.ToString() == WS_MESSAGE_KEY_GROUPS)
                 {
-                    ProcessGroupsImpl(jsonReader);
+                        ProcessGroupsImpl(jsonReader);
                 }
             }
             _initializedGroups = true;
@@ -2010,7 +2010,6 @@ namespace Microsoft.Mixer
             string etag = string.Empty;
             string sceneID = string.Empty;
             string groupID = string.Empty;
-            jsonReader.Read();
             while (jsonReader.Read() && jsonReader.Depth > startDepth)
             {
                 if (jsonReader.Value != null)
