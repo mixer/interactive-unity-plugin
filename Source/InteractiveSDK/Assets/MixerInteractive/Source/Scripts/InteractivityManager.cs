@@ -1783,26 +1783,41 @@ namespace Microsoft.Mixer
                     string keyValue = jsonReader.Value.ToString();
                     if (keyValue == WS_MESSAGE_KEY_GROUPS)
                     {
-                        var newGroup = ReadGroup(jsonReader);
-                        var groups = Groups;
-                        int existingGroupIndex = -1;
-                        for (int i = 0; i < groups.Count; i++)
+                        ProcessGroupsImpl(jsonReader);
+                    }
+                }
+            }
+        }
+
+        private void ProcessGroupsImpl(JsonReader jsonReader)
+        {
+            while (jsonReader.Read())
+            {
+                if (jsonReader.TokenType == JsonToken.EndArray)
+                {
+                    break;
+                }
+                if (jsonReader.TokenType == JsonToken.StartObject)
+                {
+                    var newGroup = ReadGroup(jsonReader);
+                    var groups = Groups;
+                    int existingGroupIndex = -1;
+                    for (int i = 0; i < groups.Count; i++)
+                    {
+                        InteractiveGroup group = groups[i];
+                        if (group.GroupID == newGroup.GroupID)
                         {
-                            InteractiveGroup group = groups[i];
-                            if (group.GroupID == newGroup.GroupID)
-                            {
-                                existingGroupIndex = i;
-                                break;
-                            }
+                            existingGroupIndex = i;
+                            break;
                         }
-                        if (existingGroupIndex != -1)
-                        {
-                            CloneGroupValues(newGroup, groups[existingGroupIndex]);
-                        }
-                        else
-                        {
-                            _groups.Add(newGroup);
-                        }
+                    }
+                    if (existingGroupIndex != -1)
+                    {
+                        CloneGroupValues(newGroup, groups[existingGroupIndex]);
+                    }
+                    else
+                    {
+                        _groups.Add(newGroup);
                     }
                 }
             }
@@ -1974,26 +1989,7 @@ namespace Microsoft.Mixer
                 if (jsonReader.Value != null &&
                     jsonReader.Value.ToString() == WS_MESSAGE_KEY_GROUPS)
                 {
-                    var newGroup = ReadGroup(jsonReader);
-                    var groups = Groups;
-                    int existingGroupIndex = -1;
-                    for (int i = 0; i < groups.Count; i++)
-                    {
-                        InteractiveGroup group = groups[i];
-                        if (group.GroupID == newGroup.GroupID)
-                        {
-                            existingGroupIndex = i;
-                            break;
-                        }
-                    }
-                    if (existingGroupIndex != -1)
-                    {
-                        CloneGroupValues(newGroup, groups[existingGroupIndex]);
-                    }
-                    else
-                    {
-                        _groups.Add(newGroup);
-                    }
+                        ProcessGroupsImpl(jsonReader);
                 }
             }
             _initializedGroups = true;
@@ -2014,7 +2010,6 @@ namespace Microsoft.Mixer
             string etag = string.Empty;
             string sceneID = string.Empty;
             string groupID = string.Empty;
-            jsonReader.Read();
             while (jsonReader.Read() && jsonReader.Depth > startDepth)
             {
                 if (jsonReader.Value != null)
