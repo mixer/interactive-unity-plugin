@@ -768,6 +768,7 @@ public class MixerInteractive : MonoBehaviour
                             if (OnGoInteractive != null)
                             {
                                 hasFiredGoInteractiveEvent = true;
+                                pendingGoInteractive = false;
                                 OnGoInteractive(this, interactivityStateChangedArgs);
                             }
                         }
@@ -1100,6 +1101,8 @@ public class MixerInteractive : MonoBehaviour
         PlayerPrefs.DeleteKey("MixerInteractive-AuthToken");
         PlayerPrefs.DeleteKey("MixerInteractive-RefreshToken");
         PlayerPrefs.Save();
+
+        InteractivityManager.SingletonInstance._authToken = string.Empty;
     }
 
     private IEnumerator InitializeCoRoutine()
