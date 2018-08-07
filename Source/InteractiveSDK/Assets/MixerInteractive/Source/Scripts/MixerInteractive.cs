@@ -554,7 +554,7 @@ public class MixerInteractive : MonoBehaviour
             Vector3 mousePosition = Vector3.zero;
             if (InteractivityManager._mousePositionsByParticipant.Count > 0)
             {
-                Dictionary<uint, Vector2> mousePositionsByParticipant = InteractivityManager._mousePositionsByParticipant;
+                Dictionary<string, Vector2> mousePositionsByParticipant = InteractivityManager._mousePositionsByParticipant;
                 var mousePositionByParticipantKeys = mousePositionsByParticipant.Keys;
                 float totalX = 0;
                 float totalY = 0;
@@ -966,9 +966,9 @@ public class MixerInteractive : MonoBehaviour
     public static bool GetMouseButtonDown(int buttonIndex = 0)
     {
         bool getButtonDownResult = false;
-        Dictionary<uint, _InternalMouseButtonState> mouseButtonStateByParticipant = InteractivityManager._mouseButtonStateByParticipant;
+        Dictionary<string, _InternalMouseButtonState> mouseButtonStateByParticipant = InteractivityManager._mouseButtonStateByParticipant;
         var mouseButtonStateByParticipantKeys = mouseButtonStateByParticipant.Keys;
-        foreach (uint mouseButtonStateByParticipantKey in mouseButtonStateByParticipantKeys)
+        foreach (string mouseButtonStateByParticipantKey in mouseButtonStateByParticipantKeys)
         {
             if (mouseButtonStateByParticipant[mouseButtonStateByParticipantKey].IsDown)
             {
@@ -989,9 +989,9 @@ public class MixerInteractive : MonoBehaviour
     public static bool GetMouseButton(int buttonIndex = 0)
     {
         bool getButtonDownResult = false;
-        Dictionary<uint, _InternalMouseButtonState> mouseButtonStateByParticipant = InteractivityManager._mouseButtonStateByParticipant;
+        Dictionary<string, _InternalMouseButtonState> mouseButtonStateByParticipant = InteractivityManager._mouseButtonStateByParticipant;
         var mouseButtonStateByParticipantKeys = mouseButtonStateByParticipant.Keys;
-        foreach (uint mouseButtonStateByParticipantKey in mouseButtonStateByParticipantKeys)
+        foreach (string mouseButtonStateByParticipantKey in mouseButtonStateByParticipantKeys)
         {
             if (mouseButtonStateByParticipant[mouseButtonStateByParticipantKey].IsPressed)
             {
@@ -1012,9 +1012,9 @@ public class MixerInteractive : MonoBehaviour
     public static bool GetMouseButtonUp(int buttonIndex = 0)
     {
         bool getButtonDownResult = false;
-        Dictionary<uint, _InternalMouseButtonState> mouseButtonStateByParticipant = InteractivityManager._mouseButtonStateByParticipant;
+        Dictionary<string, _InternalMouseButtonState> mouseButtonStateByParticipant = InteractivityManager._mouseButtonStateByParticipant;
         var mouseButtonStateByParticipantKeys = mouseButtonStateByParticipant.Keys;
-        foreach (uint mouseButtonStateByParticipantKey in mouseButtonStateByParticipantKeys)
+        foreach (string mouseButtonStateByParticipantKey in mouseButtonStateByParticipantKeys)
         {
             if (mouseButtonStateByParticipant[mouseButtonStateByParticipantKey].IsUp)
             {

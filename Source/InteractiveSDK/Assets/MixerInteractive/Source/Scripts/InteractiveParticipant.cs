@@ -45,9 +45,21 @@ namespace Microsoft.Mixer
         }
 
         /// <summary>
-        /// The the Mixer user id associated with this participant.
+        /// The the Mixer user id associated with this participant. This ID persists across sessions,
+        /// however it will be 0 for non-signed in users so we recommend using SessionID instead.
         /// </summary>
         public uint UserID
+        {
+            get;
+            internal set;
+        }
+
+        /// <summary>
+        /// The the Mixer id associated with this participant for this interactive session. 
+        /// Most of the time, you want to use this value because it will be a unique for 
+        /// identifier for anonymous users.
+        /// </summary>
+        public string SessionID
         {
             get;
             internal set;
@@ -146,7 +158,7 @@ namespace Microsoft.Mixer
             {
                 List<InteractiveButtonControl> buttonsForParticipant = new List<InteractiveButtonControl>();
                 Dictionary<string, _InternalButtonState> buttonState;
-                bool participantEntryExists = InteractivityManager._buttonStatesByParticipant.TryGetValue(UserID, out buttonState);
+                bool participantEntryExists = InteractivityManager._buttonStatesByParticipant.TryGetValue(SessionID, out buttonState);
                 if (participantEntryExists)
                 {
                     var buttonStatesByParticipantKeys = buttonState.Keys;
@@ -176,7 +188,7 @@ namespace Microsoft.Mixer
             {
                 List<InteractiveJoystickControl> joysticksForParticipant = new List<InteractiveJoystickControl>();
                 Dictionary<string, _InternalJoystickState> joystickByParticipant;
-                bool participantEntryExists = InteractivityManager._joystickStatesByParticipant.TryGetValue(UserID, out joystickByParticipant);
+                bool participantEntryExists = InteractivityManager._joystickStatesByParticipant.TryGetValue(SessionID, out joystickByParticipant);
                 if (participantEntryExists)
                 {
                     var joystickStatesByParticipantKeys = joystickByParticipant.Keys;
@@ -208,12 +220,11 @@ namespace Microsoft.Mixer
 
         internal string _etag;
         internal string _groupID;
-        internal string _sessionID;
         private List<string> channelGroups;
 
-        internal InteractiveParticipant(string newSessionID, string newEtag, uint userID, string newGroupID, string userName, List<string> newChannelGroups, uint level, DateTime lastInputAt, DateTime connectedAt, bool inputDisabled, InteractiveParticipantState state)
+        internal InteractiveParticipant(string sessionID, string newEtag, uint userID, string newGroupID, string userName, List<string> newChannelGroups, uint level, DateTime lastInputAt, DateTime connectedAt, bool inputDisabled, InteractiveParticipantState state)
         {
-            _sessionID = newSessionID;
+            SessionID = sessionID;
             UserID = userID;
             UserName = userName;
             channelGroups = newChannelGroups;

@@ -90,7 +90,16 @@ namespace Microsoft.Mixer
         /// <param name="userID">The ID of the participant who used the input control.</param>
         public double GetX(uint userID)
         {
-            return InteractivityManager.SingletonInstance._GetJoystickX(ControlID, userID);
+            return InteractivityManager.SingletonInstance._GetJoystickXByUserID(ControlID, userID);
+        }
+
+        /// <summary>
+        /// The X coordinate of the joystick for a given participant since the last call to DoWork().
+        /// </summary>
+        /// <param name="sessionID">The ID of the participant who used the input control.</param>
+        public double GetX(string sessionID)
+        {
+            return InteractivityManager.SingletonInstance._GetJoystickX(ControlID, sessionID);
         }
 
         /// <summary>
@@ -99,7 +108,16 @@ namespace Microsoft.Mixer
         /// <param name="userID">The ID of the participant who used the input control.</param>
         public double GetY(uint userID)
         {
-            return InteractivityManager.SingletonInstance._GetJoystickY(ControlID, userID);
+            return InteractivityManager.SingletonInstance._GetJoystickYByUserID(ControlID, userID);
+        }
+
+        /// <summary>
+        /// The Y coordinate of the joystick for a given participant since the last call to DoWork().
+        /// </summary>
+        /// <param name="sessionID">The ID of the participant who used the input control.</param>
+        public double GetY(string sessionID)
+        {
+            return InteractivityManager.SingletonInstance._GetJoystickY(ControlID, sessionID);
         }
 
         public InteractiveJoystickControl(string controlID, InteractiveEventType type, bool enabled, string helpText, string eTag, string sceneID, Dictionary<string, object> metaproperties) : 
@@ -109,13 +127,13 @@ namespace Microsoft.Mixer
 
         internal uint _userID;
 
-        private bool TryGetJoystickStateByParticipant(uint userID, string controlID, out _InternalJoystickState joystickState)
+        private bool TryGetJoystickStateByParticipant(string sessionID, string controlID, out _InternalJoystickState joystickState)
         {
             joystickState = new _InternalJoystickState();
             bool joystickExists = false;
             bool participantExists = false;
             Dictionary<string, _InternalJoystickState> participantControls;
-            participantExists = InteractivityManager._joystickStatesByParticipant.TryGetValue(userID, out participantControls);
+            participantExists = InteractivityManager._joystickStatesByParticipant.TryGetValue(sessionID, out participantControls);
             if (participantExists)
             {
                 bool controlExists = false;

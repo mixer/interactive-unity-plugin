@@ -250,7 +250,16 @@ namespace Microsoft.Mixer
         /// <param name="userID">The ID of the user who used the input control.</param>
         public bool GetButtonDown(uint userID)
         {
-            return InteractivityManager.SingletonInstance._GetButtonDown(ControlID, userID);
+            return InteractivityManager.SingletonInstance._GetButtonDownByUserID(ControlID, userID);
+        }
+
+        /// <summary>
+        /// Whether a given user triggered a button down since the last call to DoWork().
+        /// </summary>
+        /// <param name="sessionID">The ID of the user who used the input control.</param>
+        public bool GetButtonDown(string sessionID)
+        {
+            return InteractivityManager.SingletonInstance._GetButtonDown(ControlID, sessionID);
         }
 
         /// <summary>
@@ -259,7 +268,16 @@ namespace Microsoft.Mixer
         /// <param name="userID">The ID of the user who used the input control.</param>
         public bool GetButtonPressed(uint userID)
         {
-            return InteractivityManager.SingletonInstance._GetButtonPressed(ControlID, userID);
+            return InteractivityManager.SingletonInstance._GetButtonPressedByUserID(ControlID, userID);
+        }
+
+        /// <summary>
+        /// Whether a given user triggered a button press since the last call to DoWork().
+        /// </summary>
+        /// <param name="sessionID">The ID of the user who used the input control.</param>
+        public bool GetButtonPressed(string sessionID)
+        {
+            return InteractivityManager.SingletonInstance._GetButtonPressed(ControlID, sessionID);
         }
 
         /// <summary>
@@ -268,7 +286,16 @@ namespace Microsoft.Mixer
         /// <param name="userID">The ID of the user who used the input control.</param>
         public bool GetButtonUp(uint userID)
         {
-            return InteractivityManager.SingletonInstance._GetButtonUp(ControlID, userID);
+            return InteractivityManager.SingletonInstance._GetButtonUpByUserID(ControlID, userID);
+        }
+
+        /// <summary>
+        /// Whether a given user triggered a button up since the last call to DoWork().
+        /// </summary>
+        /// <param name="sessionID">The ID of the user who used the input control.</param>
+        public bool GetButtonUp(string sessionID)
+        {
+            return InteractivityManager.SingletonInstance._GetButtonUp(ControlID, sessionID);
         }
 
         /// <summary>
@@ -277,7 +304,16 @@ namespace Microsoft.Mixer
         /// <param name="userID">The ID of the user who used the input control.</param>
         public uint GetCountOfButtonDowns(uint userID)
         {
-            return InteractivityManager.SingletonInstance._GetCountOfButtonDowns(ControlID, userID);
+            return InteractivityManager.SingletonInstance._GetCountOfButtonDownsByUserID(ControlID, userID);
+        }
+
+        /// <summary>
+        /// The number of button downs from a given user since the last call to DoWork().
+        /// </summary>
+        /// <param name="sessionID">The ID of the user who used the input control.</param>
+        public uint GetCountOfButtonDowns(string sessionID)
+        {
+            return InteractivityManager.SingletonInstance._GetCountOfButtonDowns(ControlID, sessionID);
         }
 
         /// <summary>
@@ -286,7 +322,16 @@ namespace Microsoft.Mixer
         /// <param name="userID">The ID of the user who used the input control.</param>
         public uint GetCountOfButtonPresses(uint userID)
         {
-            return InteractivityManager.SingletonInstance._GetCountOfButtonPresses(ControlID, userID);
+            return InteractivityManager.SingletonInstance._GetCountOfButtonPressesByUserID(ControlID, userID);
+        }
+
+        /// <summary>
+        /// The number of button presses from a given user since the last call to DoWork().
+        /// </summary>
+        /// <param name="sessionID">The ID of the user who used the input control.</param>
+        public uint GetCountOfButtonPresses(string sessionID)
+        {
+            return InteractivityManager.SingletonInstance._GetCountOfButtonPresses(ControlID, sessionID);
         }
 
         /// <summary>
@@ -296,6 +341,15 @@ namespace Microsoft.Mixer
         public uint GetCountOfButtonUps(uint userID)
         {
             return InteractivityManager.SingletonInstance._GetCountOfButtonUps(ControlID, userID);
+        }
+
+        /// <summary>
+        /// The number of button ups from a given user since the last call to DoWork().
+        /// </summary>
+        /// <param name="sessionID">The ID of the user who used the input control.</param>
+        public uint GetCountOfButtonUps(string sessionID)
+        {
+            return InteractivityManager.SingletonInstance._GetCountOfButtonUps(ControlID, sessionID);
         }
 
         /// <summary>
