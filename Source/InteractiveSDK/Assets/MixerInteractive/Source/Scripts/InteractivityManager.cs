@@ -1854,7 +1854,7 @@ namespace Microsoft.Mixer
                     for (int i = 0; i < existingParticipants.Count; i++)
                     {
                         InteractiveParticipant participant = existingParticipants[i];
-                        if (participant.UserID == newParticipant.UserID)
+                        if (participant.SessionID == newParticipant.SessionID)
                         {
                             existingParticipantIndex = i;
                         }
@@ -1875,7 +1875,7 @@ namespace Microsoft.Mixer
 
         private void CloneParticipantValues(InteractiveParticipant source, InteractiveParticipant destination)
         {
-            destination._sessionID = source._sessionID;
+            destination.SessionID = source.SessionID;
             destination.UserID = source.UserID;
             destination.UserName = source.UserName;
             destination.Level = source.Level;
@@ -2439,7 +2439,7 @@ namespace Microsoft.Mixer
                                 {
                                     for (int j = _participants.Count - 1; j >= 0; j--)
                                     {
-                                        if (_participants[j].UserID == participants[i].UserID)
+                                        if (_participants[j].SessionID == participants[i].SessionID)
                                         {
                                             InteractiveParticipant participant = _participants[j];
                                             participant.State = InteractiveParticipantState.Left;
@@ -2560,7 +2560,7 @@ namespace Microsoft.Mixer
             newTransactionIDState.nextTransactionID = transactionID;
             _transactionIDsState[inputEvent.ControlID] = newTransactionIDState;
 
-            InteractiveParticipant participant = ParticipantBySessionId(participantSessionID);
+            InteractiveParticipant participant = _ParticipantBySessionID(participantSessionID);
             if (!_participantsWhoTriggeredGiveInput.ContainsKey(inputEvent.ControlID))
             {
                 _participantsWhoTriggeredGiveInput.Add(inputEvent.ControlID, new _InternalParticipantTrackingState(participant));
@@ -2585,7 +2585,7 @@ namespace Microsoft.Mixer
                 UpdateInternalTextBoxState(textEventArgs);
             }
 
-            uint participantID = participant.UserID;
+            string sessionID = participant.SessionID;
 
             // Handle screen input
             if (inputEvent.Kind == _CONTROL_KIND_SCREEN)
@@ -2597,13 +2597,13 @@ namespace Microsoft.Mixer
                     // Translate the position to screen space.
                     newMousePosition.x = newMousePosition.x * Screen.width;
                     newMousePosition.y = newMousePosition.y * Screen.height;
-                    if (_mousePositionsByParticipant.ContainsKey(participantID))
+                    if (_mousePositionsByParticipant.ContainsKey(sessionID))
                     {
-                        _mousePositionsByParticipant[participantID] = newMousePosition;
+                        _mousePositionsByParticipant[sessionID] = newMousePosition;
                     }
                     else
                     {
-                        _mousePositionsByParticipant.Add(participantID, newMousePosition);
+                        _mousePositionsByParticipant.Add(sessionID, newMousePosition);
                     }
                     InteractiveCoordinatesChangedEventArgs mouseMoveEventArgs = new InteractiveCoordinatesChangedEventArgs(
                        inputEvent.ControlID,
@@ -2653,11 +2653,11 @@ namespace Microsoft.Mixer
             }
 
             // Update the by participant data structure.
-            Dictionary<uint, Dictionary<string, object>> controlDataByParticipant = new Dictionary<uint, Dictionary<string, object>>();
+            Dictionary<string, Dictionary<string, object>> controlDataByParticipant = new Dictionary<string, Dictionary<string, object>>();
             if (_giveInputControlDataByParticipant.TryGetValue(controlType, out controlDataByParticipant))
             {
                 Dictionary<string, object> controlValues = new Dictionary<string, object>();
-                if (controlDataByParticipant.TryGetValue(participantID, out controlValues))
+                if (controlDataByParticipant.TryGetValue(sessionID, out controlValues))
                 {
                     var controlDataKeys = controlValues.Keys;
                     foreach (string key in controlDataKeys)
@@ -2668,7 +2668,7 @@ namespace Microsoft.Mixer
                             controlValues[key] = value;
                         }
                     }
-                    controlDataByParticipant[participantID] = controlValues;
+                    controlDataByParticipant[sessionID] = controlValues;
                 }
                 else
                 {
@@ -2678,17 +2678,17 @@ namespace Microsoft.Mixer
             }
             else
             {
-                _giveInputControlDataByParticipant[controlType] = new Dictionary<uint, Dictionary<string, object>>();
+                _giveInputControlDataByParticipant[controlType] = new Dictionary<string, Dictionary<string, object>>();
             }
         }
 
-        private InteractiveParticipant ParticipantBySessionId(string sessionID)
+        internal InteractiveParticipant _ParticipantBySessionID(string sessionID)
         {
             InteractiveParticipant target = null;
             var existingParticipants = Participants;
             foreach (InteractiveParticipant participant in existingParticipants)
             {
-                if (participant._sessionID == sessionID)
+                if (participant.SessionID == sessionID)
                 {
                     target = participant;
                     break;
@@ -2697,7 +2697,7 @@ namespace Microsoft.Mixer
             return target;
         }
 
-        internal InteractiveParticipant _ParticipantByUserId(uint userID)
+        private InteractiveParticipant _ParticipantByUserID(uint userID)
         {
             InteractiveParticipant target = null;
             var existingParticipants = Participants;
@@ -2712,108 +2712,158 @@ namespace Microsoft.Mixer
             return target;
         }
 
-        internal bool _GetButtonDown(string controlID, uint userID)
+        internal bool _GetButtonDownByUserID(string controlID, uint userID)
+        {
+            InteractiveParticipant participant = _ParticipantByUserID(userID);
+            string sessionID = participant == null ? string.Empty : participant.SessionID;
+            return _GetButtonDown(controlID, sessionID);
+        }
+
+        internal bool _GetButtonDown(string controlID, string sessionID)
         {
             bool getButtonDownResult = false;
             bool participantExists = false;
             Dictionary<string, _InternalButtonState> participantControls;
-            participantExists = _buttonStatesByParticipant.TryGetValue(userID, out participantControls);
-            if (participantExists)
+            if (!string.IsNullOrEmpty(sessionID))
             {
-                bool controlExists = false;
-                _InternalButtonState buttonState;
-                controlExists = participantControls.TryGetValue(controlID, out buttonState);
-                if (controlExists)
+                participantExists = _buttonStatesByParticipant.TryGetValue(sessionID, out participantControls);
+                if (participantExists)
                 {
-                    getButtonDownResult = buttonState.ButtonCountState.CountOfButtonDownEvents > 0;
+                    bool controlExists = false;
+                    _InternalButtonState buttonState;
+                    controlExists = participantControls.TryGetValue(controlID, out buttonState);
+                    if (controlExists)
+                    {
+                        getButtonDownResult = buttonState.ButtonCountState.CountOfButtonDownEvents > 0;
+                    }
                 }
-            }
-            else
-            {
-                getButtonDownResult = false;
+                else
+                {
+                    getButtonDownResult = false;
+                }
             }
             return getButtonDownResult;
         }
 
-        internal bool _GetButtonPressed(string controlID, uint userID)
+        internal bool _GetButtonPressedByUserID(string controlID, uint userID)
+        {
+            InteractiveParticipant participant = _ParticipantByUserID(userID);
+            string sessionID = participant == null ? string.Empty : participant.SessionID;
+            return _GetButtonPressed(controlID, sessionID);
+        }
+
+        internal bool _GetButtonPressed(string controlID, string sessionID)
         {
             bool getButtonResult = false;
             bool participantExists = false;
             Dictionary<string, _InternalButtonState> participantControls;
-            participantExists = _buttonStatesByParticipant.TryGetValue(userID, out participantControls);
-            if (participantExists)
+            if (!string.IsNullOrEmpty(sessionID))
             {
-                bool controlExists = false;
-                _InternalButtonState buttonState;
-                controlExists = participantControls.TryGetValue(controlID, out buttonState);
-                if (controlExists)
+                participantExists = _buttonStatesByParticipant.TryGetValue(sessionID, out participantControls);
+                if (participantExists)
                 {
-                    getButtonResult = buttonState.ButtonCountState.CountOfButtonPressEvents > 0;
+                    bool controlExists = false;
+                    _InternalButtonState buttonState;
+                    controlExists = participantControls.TryGetValue(controlID, out buttonState);
+                    if (controlExists)
+                    {
+                        getButtonResult = buttonState.ButtonCountState.CountOfButtonPressEvents > 0;
+                    }
                 }
-            }
-            else
-            {
-                getButtonResult = false;
+                else
+                {
+                    getButtonResult = false;
+                }
             }
             return getButtonResult;
         }
 
-        internal bool _GetButtonUp(string controlID, uint userID)
+        internal bool _GetButtonUpByUserID(string controlID, uint userID)
+        {
+            InteractiveParticipant participant = _ParticipantByUserID(userID);
+            string sessionID = participant == null ? string.Empty : participant.SessionID;
+            return _GetButtonUp(controlID, sessionID);
+        }
+
+        internal bool _GetButtonUp(string controlID, string sessionID)
         {
             bool getButtonUpResult = false;
             bool participantExists = false;
             Dictionary<string, _InternalButtonState> participantControls;
-            participantExists = _buttonStatesByParticipant.TryGetValue(userID, out participantControls);
-            if (participantExists)
+            if (!string.IsNullOrEmpty(sessionID))
             {
-                bool controlExists = false;
-                _InternalButtonState buttonState;
-                controlExists = participantControls.TryGetValue(controlID, out buttonState);
-                if (controlExists)
+                participantExists = _buttonStatesByParticipant.TryGetValue(sessionID, out participantControls);
+                if (participantExists)
                 {
-                    getButtonUpResult = buttonState.ButtonCountState.CountOfButtonUpEvents > 0;
+                    bool controlExists = false;
+                    _InternalButtonState buttonState;
+                    controlExists = participantControls.TryGetValue(controlID, out buttonState);
+                    if (controlExists)
+                    {
+                        getButtonUpResult = buttonState.ButtonCountState.CountOfButtonUpEvents > 0;
+                    }
                 }
-            }
-            else
-            {
-                getButtonUpResult = false;
+                else
+                {
+                    getButtonUpResult = false;
+                }
             }
             return getButtonUpResult;
         }
 
-        internal uint _GetCountOfButtonDowns(string controlID, uint userID)
+        internal uint _GetCountOfButtonDownsByUserID(string controlID, uint userID)
+        {
+            InteractiveParticipant participant = _ParticipantByUserID(userID);
+            string sessionID = participant == null ? string.Empty : participant.SessionID;
+            return _GetCountOfButtonDowns(controlID, sessionID);
+        }
+
+        internal uint _GetCountOfButtonDowns(string controlID, string sessionID)
         {
             uint countOfButtonDownEvents = 0;
             bool participantExists = false;
             Dictionary<string, _InternalButtonState> participantControls;
-            participantExists = _buttonStatesByParticipant.TryGetValue(userID, out participantControls);
-            if (participantExists)
+            if (!string.IsNullOrEmpty(sessionID))
             {
-                bool controlExists = false;
-                _InternalButtonState buttonState;
-                controlExists = participantControls.TryGetValue(controlID, out buttonState);
-                if (controlExists)
+                participantExists = _buttonStatesByParticipant.TryGetValue(sessionID, out participantControls);
+                if (participantExists)
                 {
-                    countOfButtonDownEvents = buttonState.ButtonCountState.CountOfButtonDownEvents;
+                    bool controlExists = false;
+                    _InternalButtonState buttonState;
+                    controlExists = participantControls.TryGetValue(controlID, out buttonState);
+                    if (controlExists)
+                    {
+                        countOfButtonDownEvents = buttonState.ButtonCountState.CountOfButtonDownEvents;
+                    }
                 }
             }
             return countOfButtonDownEvents;
         }
 
-        internal uint _GetCountOfButtonPresses(string controlID, uint userID)
+        internal uint _GetCountOfButtonPressesByUserID(string controlID, uint userID)
+        {
+            InteractiveParticipant participant = _ParticipantByUserID(userID);
+            string sessionID = participant == null ? string.Empty : participant.SessionID;
+            return _GetCountOfButtonPresses(controlID, sessionID);
+        }
+
+        internal uint _GetCountOfButtonPresses(string controlID, string sessionID)
         {
             uint countOfButtonPressEvents = 0;
             bool participantExists = false;
             Dictionary<string, _InternalButtonState> participantControls;
-            participantExists = _buttonStatesByParticipant.TryGetValue(userID, out participantControls);
-            if (participantExists)
+            if (!string.IsNullOrEmpty(sessionID))
             {
-                bool controlExists = false;
-                _InternalButtonState buttonState;
-                controlExists = participantControls.TryGetValue(controlID, out buttonState);
-                if (controlExists)
+                participantExists = _buttonStatesByParticipant.TryGetValue(sessionID, out participantControls);
+                if (participantExists)
                 {
-                    countOfButtonPressEvents = buttonState.ButtonCountState.CountOfButtonPressEvents;
+                    bool controlExists = false;
+                    _InternalButtonState buttonState;
+                    controlExists = participantControls.TryGetValue(controlID, out buttonState);
+                    if (controlExists)
+                    {
+                        countOfButtonPressEvents = buttonState.ButtonCountState.CountOfButtonPressEvents;
+                    }
                 }
             }
             return countOfButtonPressEvents;
@@ -2821,37 +2871,50 @@ namespace Microsoft.Mixer
 
         internal uint _GetCountOfButtonUps(string controlID, uint userID)
         {
+            InteractiveParticipant participant = _ParticipantByUserID(userID);
+            string sessionID = participant == null ? string.Empty : participant.SessionID;
+            return _GetCountOfButtonUps(controlID, sessionID);
+        }
+
+        internal uint _GetCountOfButtonUps(string controlID, string sessionID)
+        {
             uint countOfButtonUpEvents = 0;
             _InternalButtonState buttonState;
             bool participantExists = false;
             Dictionary<string, _InternalButtonState> participantControls;
-            participantExists = _buttonStatesByParticipant.TryGetValue(userID, out participantControls);
-            if (participantExists)
+            if (!string.IsNullOrEmpty(sessionID))
             {
-                bool controlExists = false;
-                controlExists = participantControls.TryGetValue(controlID, out buttonState);
-                if (controlExists)
+                participantExists = _buttonStatesByParticipant.TryGetValue(sessionID, out participantControls);
+                if (participantExists)
                 {
-                    countOfButtonUpEvents = buttonState.ButtonCountState.CountOfButtonUpEvents;
+                    bool controlExists = false;
+                    controlExists = participantControls.TryGetValue(controlID, out buttonState);
+                    if (controlExists)
+                    {
+                        countOfButtonUpEvents = buttonState.ButtonCountState.CountOfButtonUpEvents;
+                    }
                 }
             }
             return countOfButtonUpEvents;
         }
 
-        internal bool _TryGetButtonStateByParticipant(uint userID, string controlID, out _InternalButtonState buttonState)
+        internal bool _TryGetButtonStateByParticipant(string sessionID, string controlID, out _InternalButtonState buttonState)
         {
             buttonState = new _InternalButtonState();
             bool buttonExists = false;
             bool participantExists = false;
             Dictionary<string, _InternalButtonState> participantControls;
-            participantExists = _buttonStatesByParticipant.TryGetValue(userID, out participantControls);
-            if (participantExists)
+            if (!string.IsNullOrEmpty(sessionID))
             {
-                bool controlExists = false;
-                controlExists = participantControls.TryGetValue(controlID, out buttonState);
-                if (controlExists)
+                participantExists = _buttonStatesByParticipant.TryGetValue(sessionID, out participantControls);
+                if (participantExists)
                 {
-                    buttonExists = true;
+                    bool controlExists = false;
+                    controlExists = participantControls.TryGetValue(controlID, out buttonState);
+                    if (controlExists)
+                    {
+                        buttonExists = true;
+                    }
                 }
             }
             return buttonExists;
@@ -2872,62 +2935,89 @@ namespace Microsoft.Mixer
             return joystick;
         }
 
-        internal double _GetJoystickX(string controlID, uint userID)
+        internal double _GetJoystickXByUserID(string controlID, uint userID)
+        {
+            double joystickX = 0;
+            InteractiveParticipant participant = _ParticipantByUserID(userID);
+            string sessionID = participant == null ? string.Empty : participant.SessionID;
+            if (!string.IsNullOrEmpty(sessionID))
+            {
+                joystickX = _GetJoystickX(controlID, sessionID);
+            }
+            return joystickX;
+        }
+
+        internal double _GetJoystickX(string controlID, string sessionID)
         {
             double joystickX = 0;
             _InternalJoystickState joystickState;
-            if (TryGetJoystickStateByParticipant(userID, controlID, out joystickState))
+            if (string.IsNullOrEmpty(sessionID) && 
+                TryGetJoystickStateByParticipant(sessionID, controlID, out joystickState))
             {
                 joystickX = joystickState.X;
             }
             return joystickX;
         }
 
-        internal double _GetJoystickY(string controlID, uint userID)
+        internal double _GetJoystickYByUserID(string controlID, uint userID)
+        {
+            InteractiveParticipant participant = _ParticipantByUserID(userID);
+            string sessionID = participant == null ? string.Empty : participant.SessionID;
+            return _GetJoystickY(controlID, sessionID);
+        }
+
+        internal double _GetJoystickY(string controlID, string sessionID)
         {
             double joystickY = 0;
             _InternalJoystickState joystickState;
-            if (TryGetJoystickStateByParticipant(userID, controlID, out joystickState))
+            if (!string.IsNullOrEmpty(sessionID) &&
+                TryGetJoystickStateByParticipant(sessionID, controlID, out joystickState))
             {
                 joystickY = joystickState.Y;
             }
             return joystickY;
         }
 
-        private bool TryGetJoystickStateByParticipant(uint userID, string controlID, out _InternalJoystickState joystickState)
+        private bool TryGetJoystickStateByParticipant(string sessionID, string controlID, out _InternalJoystickState joystickState)
         {
             joystickState = new _InternalJoystickState();
             bool joystickExists = false;
             bool participantExists = false;
             Dictionary<string, _InternalJoystickState> participantControls;
-            participantExists = _joystickStatesByParticipant.TryGetValue(userID, out participantControls);
-            if (participantExists)
+            if (!string.IsNullOrEmpty(sessionID))
             {
-                bool controlExists = false;
-                controlExists = participantControls.TryGetValue(controlID, out joystickState);
-                if (controlExists)
+                participantExists = _joystickStatesByParticipant.TryGetValue(sessionID, out participantControls);
+                if (participantExists)
                 {
-                    joystickExists = true;
+                    bool controlExists = false;
+                    controlExists = participantControls.TryGetValue(controlID, out joystickState);
+                    if (controlExists)
+                    {
+                        joystickExists = true;
+                    }
                 }
             }
             return joystickExists;
         }
 
-        internal _InternalMouseButtonState TryGetMouseButtonState(uint userID)
+        internal _InternalMouseButtonState TryGetMouseButtonState(string sessionID)
         {
             _InternalMouseButtonState mouseButtonState = new _InternalMouseButtonState();
-            _mouseButtonStateByParticipant.TryGetValue(userID, out mouseButtonState);
+            _mouseButtonStateByParticipant.TryGetValue(sessionID, out mouseButtonState);
             return mouseButtonState;
         }
 
-        internal string GetText(string controlID, uint userID)
+        internal string GetText(string controlID, string sessionID)
         {
             string text = string.Empty;
             Dictionary<string, string> participantTextBoxes;
-            bool participantExists = _textboxValuesByParticipant.TryGetValue(userID, out participantTextBoxes);
-            if (participantExists)
+            if (!string.IsNullOrEmpty(sessionID))
             {
-                participantTextBoxes.TryGetValue(controlID, out text);
+                bool participantExists = _textboxValuesByParticipant.TryGetValue(sessionID, out participantTextBoxes);
+                if (participantExists)
+                {
+                    participantTextBoxes.TryGetValue(controlID, out text);
+                }
             }
             return text;
         }
@@ -3013,16 +3103,16 @@ namespace Microsoft.Mixer
         internal IList<InteractiveTextResult> _GetText(string controlID)
         {
             List<InteractiveTextResult> interactiveTextResults = new List<InteractiveTextResult>();
-            InteractivityManager interactivityManager = InteractivityManager.SingletonInstance;
-            Dictionary<uint, Dictionary<string, string>> textboxValuesByParticipant = InteractivityManager._textboxValuesByParticipant;
-            var participantUserIds = textboxValuesByParticipant.Keys;
-            foreach (uint participantUserId in participantUserIds)
+            InteractivityManager interactivityManager = SingletonInstance;
+            Dictionary<string, Dictionary<string, string>> textboxValuesByParticipant = _textboxValuesByParticipant;
+            var participantSessionIDs = textboxValuesByParticipant.Keys;
+            foreach (string participantSessionID in participantSessionIDs)
             {
-                Dictionary<string, string> textboxValues = textboxValuesByParticipant[participantUserId];
+                Dictionary<string, string> textboxValues = textboxValuesByParticipant[participantSessionID];
                 string text = string.Empty;
                 textboxValues.TryGetValue(controlID, out text);
                 var newTextResult = new InteractiveTextResult();
-                newTextResult.Participant = interactivityManager._ParticipantByUserId(participantUserId);
+                newTextResult.Participant = interactivityManager._ParticipantBySessionID(participantSessionID);
                 newTextResult.Text = text;
                 interactiveTextResults.Add(newTextResult);
             }
@@ -3247,7 +3337,7 @@ namespace Microsoft.Mixer
                 jsonWriter.WriteStartArray();
                 jsonWriter.WriteStartObject();
                 jsonWriter.WritePropertyName(WS_MESSAGE_KEY_SESSION_ID);
-                jsonWriter.WriteValue(participant._sessionID);
+                jsonWriter.WriteValue(participant.SessionID);
                 jsonWriter.WritePropertyName(WS_MESSAGE_KEY_ETAG);
                 jsonWriter.WriteValue(participant._etag);
                 jsonWriter.WritePropertyName(WS_MESSAGE_KEY_GROUP_ID);
@@ -3655,15 +3745,15 @@ namespace Microsoft.Mixer
 
         // Control-specific data structures
         internal static Dictionary<string, _InternalButtonCountState> _buttonStates;
-        internal static Dictionary<uint, Dictionary<string, _InternalButtonState>> _buttonStatesByParticipant;
+        internal static Dictionary<string, Dictionary<string, _InternalButtonState>> _buttonStatesByParticipant;
         internal static Dictionary<string, _InternalJoystickState> _joystickStates;
-        internal static Dictionary<uint, Dictionary<string, _InternalJoystickState>> _joystickStatesByParticipant;
-        internal static Dictionary<uint, Dictionary<string, string>> _textboxValuesByParticipant;
-        internal static Dictionary<uint, _InternalMouseButtonState> _mouseButtonStateByParticipant;
-        internal static Dictionary<uint, Vector2> _mousePositionsByParticipant;
+        internal static Dictionary<string, Dictionary<string, _InternalJoystickState>> _joystickStatesByParticipant;
+        internal static Dictionary<string, Dictionary<string, string>> _textboxValuesByParticipant;
+        internal static Dictionary<string, _InternalMouseButtonState> _mouseButtonStateByParticipant;
+        internal static Dictionary<string, Vector2> _mousePositionsByParticipant;
 
         // Generic data structures for storing any control data
-        internal static Dictionary<string, Dictionary<uint, Dictionary<string, object>>> _giveInputControlDataByParticipant;
+        internal static Dictionary<string, Dictionary<string, Dictionary<string, object>>> _giveInputControlDataByParticipant;
         internal static Dictionary<string, Dictionary<string, object>> _giveInputControlData;
         internal static Dictionary<string, object> _giveInputKeyValues;
         internal static Dictionary<string, _InternalParticipantTrackingState> _participantsWhoTriggeredGiveInput;
@@ -3695,7 +3785,7 @@ namespace Microsoft.Mixer
             _websocketHosts = new List<string>();
 
             _buttonStates = new Dictionary<string, _InternalButtonCountState>();
-            _buttonStatesByParticipant = new Dictionary<uint, Dictionary<string, _InternalButtonState>>();
+            _buttonStatesByParticipant = new Dictionary<string, Dictionary<string, _InternalButtonState>>();
 
             if (Application.isEditor)
             {
@@ -3724,18 +3814,18 @@ namespace Microsoft.Mixer
             }
 
             _joystickStates = new Dictionary<string, _InternalJoystickState>();
-            _joystickStatesByParticipant = new Dictionary<uint, Dictionary<string, _InternalJoystickState>>();
-            _mouseButtonStateByParticipant = new Dictionary<uint, _InternalMouseButtonState>();
-            _mousePositionsByParticipant = new Dictionary<uint, Vector2>();
+            _joystickStatesByParticipant = new Dictionary<string, Dictionary<string, _InternalJoystickState>>();
+            _mouseButtonStateByParticipant = new Dictionary<string, _InternalMouseButtonState>();
+            _mousePositionsByParticipant = new Dictionary<string, Vector2>();
 
             _participantsWhoTriggeredGiveInput = new Dictionary<string, _InternalParticipantTrackingState>();
             _queuedControlPropertyUpdates = new Dictionary<string, Dictionary<string, _InternalControlPropertyUpdateData>>();
             _transactionIDsState = new Dictionary<string, InternalTransactionIDState>();
 
-            _giveInputControlDataByParticipant = new Dictionary<string, Dictionary<uint, Dictionary<string, object>>>();
+            _giveInputControlDataByParticipant = new Dictionary<string, Dictionary<string, Dictionary<string, object>>>();
             _giveInputControlData = new Dictionary<string, Dictionary<string, object>>();
             _giveInputKeyValues = new Dictionary<string, object>();
-            _textboxValuesByParticipant = new Dictionary<uint, Dictionary<string, string>>();
+            _textboxValuesByParticipant = new Dictionary<string, Dictionary<string, string>>();
 
             _streamingAssetsPath = Application.streamingAssetsPath;
 
@@ -3813,8 +3903,8 @@ namespace Microsoft.Mixer
                 _buttonStates[key] = newButtonState;
             }
 
-            List<uint> _buttonStatesByParticipantKeys = new List<uint>(_buttonStatesByParticipant.Keys);
-            foreach (uint key in _buttonStatesByParticipantKeys)
+            List<string> _buttonStatesByParticipantKeys = new List<string>(_buttonStatesByParticipant.Keys);
+            foreach (string key in _buttonStatesByParticipantKeys)
             {
                 List<string> _buttonStatesByParticipantButtonStateKeys = new List<string>(_buttonStatesByParticipant[key].Keys);
                 foreach (string controlKey in _buttonStatesByParticipantButtonStateKeys)
@@ -3840,8 +3930,8 @@ namespace Microsoft.Mixer
             }
 
             // Mouse button state
-            List<uint> _mouseButtonStateByParticipantKeys = new List<uint>(_mouseButtonStateByParticipant.Keys);
-            foreach (uint _mouseButtonStateByParticipantKey in _mouseButtonStateByParticipantKeys)
+            List<string> _mouseButtonStateByParticipantKeys = new List<string>(_mouseButtonStateByParticipant.Keys);
+            foreach (string _mouseButtonStateByParticipantKey in _mouseButtonStateByParticipantKeys)
             {
                 _InternalMouseButtonState oldMouseButtonState = _mouseButtonStateByParticipant[_mouseButtonStateByParticipantKey];
                 _InternalMouseButtonState newMouseButtonState = new _InternalMouseButtonState();
@@ -3920,10 +4010,10 @@ namespace Microsoft.Mixer
         private void UpdateInternalButtonState(InteractiveButtonEventArgs e)
         {
             // Make sure the entry exists
-            uint participantId = e.Participant.UserID;
+            string sessionID = e.Participant.SessionID;
             string controlID = e.ControlID;
             Dictionary<string, _InternalButtonState> buttonState;
-            bool participantEntryExists = _buttonStatesByParticipant.TryGetValue(participantId, out buttonState);
+            bool participantEntryExists = _buttonStatesByParticipant.TryGetValue(sessionID, out buttonState);
             if (!participantEntryExists)
             {
                 buttonState = new Dictionary<string, _InternalButtonState>();
@@ -3932,7 +4022,7 @@ namespace Microsoft.Mixer
                 newControlButtonState.IsPressed = e.IsPressed;
                 newControlButtonState.IsUp = !e.IsPressed;
                 buttonState.Add(controlID, newControlButtonState);
-                _buttonStatesByParticipant.Add(participantId, buttonState);
+                _buttonStatesByParticipant.Add(sessionID, buttonState);
             }
             else
             {
@@ -3950,9 +4040,9 @@ namespace Microsoft.Mixer
             }
 
             // Populate the structure that's by participant
-            bool wasPreviouslyPressed = _buttonStatesByParticipant[participantId][controlID].ButtonCountState.NextCountOfButtonPressEvents > 0;
+            bool wasPreviouslyPressed = _buttonStatesByParticipant[sessionID][controlID].ButtonCountState.NextCountOfButtonPressEvents > 0;
             bool isCurrentlyPressed = e.IsPressed;
-            _InternalButtonState newState = _buttonStatesByParticipant[participantId][controlID];
+            _InternalButtonState newState = _buttonStatesByParticipant[sessionID][controlID];
             if (isCurrentlyPressed)
             {
                 if (!wasPreviouslyPressed)
@@ -3996,7 +4086,7 @@ namespace Microsoft.Mixer
             }
             newState.ButtonCountState = ButtonCountState;
 
-            _buttonStatesByParticipant[participantId][controlID] = newState;
+            _buttonStatesByParticipant[sessionID][controlID] = newState;
 
             // Populate button count state
             _InternalButtonCountState existingButtonCountState;
@@ -4014,11 +4104,11 @@ namespace Microsoft.Mixer
         private void UpdateInternalJoystickState(InteractiveJoystickEventArgs e)
         {
             // Make sure the entry exists
-            uint participantId = e.Participant.UserID;
+            string sessionID = e.Participant.SessionID;
             string controlID = e.ControlID;
             Dictionary<string, _InternalJoystickState> joystickByParticipant;
             _InternalJoystickState newJoystickStateByParticipant;
-            bool participantEntryExists = _joystickStatesByParticipant.TryGetValue(participantId, out joystickByParticipant);
+            bool participantEntryExists = _joystickStatesByParticipant.TryGetValue(sessionID, out joystickByParticipant);
             if (!participantEntryExists)
             {
                 joystickByParticipant = new Dictionary<string, _InternalJoystickState>();
@@ -4026,7 +4116,7 @@ namespace Microsoft.Mixer
                 newJoystickStateByParticipant.X = e.X;
                 newJoystickStateByParticipant.Y = e.Y;
                 newJoystickStateByParticipant.countOfUniqueJoystickInputs = 1;
-                _joystickStatesByParticipant.Add(participantId, joystickByParticipant);
+                _joystickStatesByParticipant.Add(sessionID, joystickByParticipant);
             }
             else
             {
@@ -4048,7 +4138,7 @@ namespace Microsoft.Mixer
                     (newJoystickStateByParticipant.Y * (countOfUniqueJoystickByParticipantInputs - 1) / (countOfUniqueJoystickByParticipantInputs)) +
                     (e.Y * (1 / countOfUniqueJoystickByParticipantInputs));
             }
-            _joystickStatesByParticipant[e.Participant.UserID][e.ControlID] = newJoystickStateByParticipant;
+            _joystickStatesByParticipant[sessionID][e.ControlID] = newJoystickStateByParticipant;
 
             // Update the joystick state
             _InternalJoystickState newJoystickState;
@@ -4075,17 +4165,17 @@ namespace Microsoft.Mixer
         private void UpdateInternalTextBoxState(InteractiveTextEventArgs e)
         {
             // Make sure the entry exists
-            uint participantId = e.Participant.UserID;
+            string sessionID = e.Participant.SessionID;
             string controlID = e.ControlID;
             string text = e.Text;
             Dictionary<string, string> newTextStateByParticipant;
             string newTextState = string.Empty;
-            bool participantEntryExists = _textboxValuesByParticipant.TryGetValue(participantId, out newTextStateByParticipant);
+            bool participantEntryExists = _textboxValuesByParticipant.TryGetValue(sessionID, out newTextStateByParticipant);
             if (!participantEntryExists)
             {
                 newTextStateByParticipant = new Dictionary<string, string>();
                 newTextStateByParticipant.Add(controlID, text);
-                _textboxValuesByParticipant.Add(participantId, newTextStateByParticipant);
+                _textboxValuesByParticipant.Add(sessionID, newTextStateByParticipant);
             }
             else
             {
@@ -4095,16 +4185,16 @@ namespace Microsoft.Mixer
                     newTextStateByParticipant.Add(controlID, text);
                 }
             }
-            _textboxValuesByParticipant[e.Participant.UserID][e.ControlID] = text;
+            _textboxValuesByParticipant[sessionID][e.ControlID] = text;
         }
 
         private void UpdateInternalMouseButtonState(InteractiveMouseButtonEventArgs e)
         {
             // Make sure the entry exists
-            uint participantId = e.Participant.UserID;
+            string sessionId = e.Participant.SessionID;
             bool isPressed = e.IsPressed;
             _InternalMouseButtonState buttonState;
-            bool participantEntryExists = _mouseButtonStateByParticipant.TryGetValue(participantId, out buttonState);
+            bool participantEntryExists = _mouseButtonStateByParticipant.TryGetValue(sessionId, out buttonState);
             if (!participantEntryExists)
             {
                 buttonState = new _InternalMouseButtonState();
@@ -4114,13 +4204,13 @@ namespace Microsoft.Mixer
                 buttonState.NextIsDown = e.IsPressed;
                 buttonState.NextIsPressed = e.IsPressed;
                 buttonState.NextIsUp = !e.IsPressed;
-                _mouseButtonStateByParticipant.Add(participantId, buttonState);
+                _mouseButtonStateByParticipant.Add(sessionId, buttonState);
             }
-            _InternalMouseButtonState newState = _mouseButtonStateByParticipant[participantId];
+            _InternalMouseButtonState newState = _mouseButtonStateByParticipant[sessionId];
             newState.NextIsDown = isPressed;
             newState.NextIsPressed = isPressed;
             newState.NextIsUp = !isPressed;
-            _mouseButtonStateByParticipant[participantId] = newState;
+            _mouseButtonStateByParticipant[sessionId] = newState;
         }
 
         internal void _QueuePropertyUpdate(string sceneID, string controlID, string name, bool value)

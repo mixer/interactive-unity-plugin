@@ -22,18 +22,16 @@
  * OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
-using Microsoft;
-using UnityEngine;
 using Microsoft.Mixer;
+using UnityEngine;
 
 namespace MixerInteractiveExamples
 {
     public class ControlCharacter : MonoBehaviour
     {
-
         public float speed;
 
-        private uint participantID;
+        private string participantID;
 
         // Use this for initialization
         void Start()
@@ -48,7 +46,7 @@ namespace MixerInteractiveExamples
             if (MixerInteractive.Participants.Count > 0)
             {
                 // For this example, we'll choose the 1st participant.
-                participantID = MixerInteractive.Participants[0].UserID;
+                participantID = MixerInteractive.Participants[0].SessionID;
             }
 
             // Allow the audience to control the in game character.
