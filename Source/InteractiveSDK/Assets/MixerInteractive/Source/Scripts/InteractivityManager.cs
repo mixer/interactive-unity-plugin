@@ -1941,13 +1941,13 @@ namespace Microsoft.Mixer
                                 jsonReader.Read();
                                 lastInputAtMillisecondsPastEpoch = Convert.ToDouble(jsonReader.Value);
                                 DateTime lastInputAtDateTime = new DateTime(1970, 1, 1, 0, 0, 0, 0, System.DateTimeKind.Utc);
-                                lastInputAt = lastInputAtDateTime.AddMilliseconds(lastInputAtMillisecondsPastEpoch).ToLocalTime();
+                                lastInputAt = lastInputAtDateTime.AddMilliseconds(lastInputAtMillisecondsPastEpoch).ToUniversalTime();
                                 break;
                             case WS_MESSAGE_KEY_CONNECTED_AT:
                                 jsonReader.Read();
                                 connectedAtMillisecondsPastEpoch = Convert.ToDouble(jsonReader.Value);
                                 DateTime connectedAtDateTime = new DateTime(1970, 1, 1, 0, 0, 0, 0, System.DateTimeKind.Utc);
-                                connectedAt = connectedAtDateTime.AddMilliseconds(connectedAtMillisecondsPastEpoch).ToLocalTime();
+                                connectedAt = connectedAtDateTime.AddMilliseconds(connectedAtMillisecondsPastEpoch).ToUniversalTime();
                                 break;
                             case WS_MESSAGE_KEY_GROUP_ID:
                                 jsonReader.Read();
