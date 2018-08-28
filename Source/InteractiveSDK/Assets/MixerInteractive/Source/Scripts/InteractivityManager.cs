@@ -958,6 +958,14 @@ namespace Microsoft.Mixer
             {
                 _LogError("Connection failed (error code 4021): You are connected to this session somewhere else. Please disconnect from that session and try again.");
             }
+            else if (args.Code == 4025)
+            {
+                _LogError("Connection failed (error code 4025): The participant can no longer access the session. This may be because they were banned.");
+            }
+            else if (args.Code == 4027)
+            {
+                _LogError("Connection failed (error code 4027): The game client was purposely terminated and should not try to reconnect.");
+            }
             else
             {
                 // Any other type of error means we didn't succeed in connecting. If that happens we need to try to reconnect.
