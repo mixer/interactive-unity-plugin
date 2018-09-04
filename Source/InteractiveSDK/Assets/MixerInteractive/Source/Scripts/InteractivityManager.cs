@@ -1758,7 +1758,7 @@ namespace Microsoft.Mixer
                     string keyValue = jsonReader.Value.ToString();
                     if (keyValue == WS_MESSAGE_KEY_SCENES)
                     {
-                        _scenes.Add(ReadScene(jsonReader));
+                        _scenes.AddRange(ReadScenes(jsonReader));
                     }
                 }
             }
