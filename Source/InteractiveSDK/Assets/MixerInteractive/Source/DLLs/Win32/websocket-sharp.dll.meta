@@ -1,7 +1,5 @@
 fileFormatVersion: 2
 guid: 7e7b2c95ff589084689f7a8d677a1b8d
-timeCreated: 1492389967
-licenseType: Store
 PluginImporter:
   externalObjects: {}
   serializedVersion: 2
@@ -24,6 +22,7 @@ PluginImporter:
         Exclude Win64: 0
         Exclude WindowsStoreApps: 1
         Exclude XboxOne: 1
+        Exclude iOS: 0
   - first:
       '': OSXIntel
     second:
@@ -39,7 +38,7 @@ PluginImporter:
   - first:
       Any: 
     second:
-      enabled: 0
+      enabled: 1
       settings:
         Exclude Editor: 0
         Exclude Linux: 0
@@ -59,7 +58,7 @@ PluginImporter:
       settings:
         CPU: AnyCPU
         DefaultValueInitialized: true
-        OS: Windows
+        OS: AnyOS
   - first:
       Facebook: Win
     second:
@@ -118,6 +117,14 @@ PluginImporter:
         PlaceholderPath: 
         SDK: AnySDK
         ScriptingBackend: AnyScriptingBackend
+  - first:
+      iPhone: iOS
+    second:
+      enabled: 1
+      settings:
+        AddToEmbeddedBinaries: false
+        CompileFlags: 
+        FrameworkDependencies: 
   userData: 
   assetBundleName: 
   assetBundleVariant: 
