@@ -1517,6 +1517,9 @@ namespace Microsoft.Mixer
                                 case WS_MESSAGE_METHOD_ON_SCENE_CREATE:
                                     HandleSceneCreate(jsonReader);
                                     break;
+                                case WS_MESSAGE_METHOD_ON_SCENE_DELETE:
+                                    HandleSceneDelete(jsonReader);
+                                    break;
                                 default:
                                     // No-op. We don't throw an error because the SDK only implements a
                                     // subset of the total possible server messages so we expect to see
@@ -1759,6 +1762,26 @@ namespace Microsoft.Mixer
                     if (keyValue == WS_MESSAGE_KEY_SCENES)
                     {
                         _scenes.AddRange(ReadScenes(jsonReader));
+                    }
+                }
+            }
+        }
+
+        private void HandleSceneDelete(JsonReader jsonReader)
+        {
+            while (jsonReader.Read())
+            {
+                if (jsonReader.Value != null)
+                {
+                    string keyValue = jsonReader.Value.ToString();
+                    if (keyValue == WS_MESSAGE_KEY_SCENE_ID)
+                    {
+                        string sceneID = jsonReader.ReadAsString();
+                        InteractiveScene interactiveScene = _scenes.Find(t => t.SceneID == sceneID);
+                        if (interactiveScene != null)
+                        {
+                            _scenes.Remove(interactiveScene);
+                        }
                     }
                 }
             }
@@ -3701,6 +3724,7 @@ namespace Microsoft.Mixer
         private const string WS_MESSAGE_METHOD_ON_GROUP_UPDATE = "onGroupUpdate";
         private const string WS_MESSAGE_METHOD_ON_READY = "onReady";
         private const string WS_MESSAGE_METHOD_ON_SCENE_CREATE = "onSceneCreate";
+        private const string WS_MESSAGE_METHOD_ON_SCENE_DELETE = "onSceneDelete";
         private const string WS_MESSAGE_METHOD_SET_CAPTURE_TRANSACTION = "capture";
         private const string WS_MESSAGE_METHOD_SET_COMPRESSION = "setCompression";
         private const string WS_MESSAGE_METHOD_SET_CONTROL_FIRED = "setControlFired";
