@@ -2596,6 +2596,13 @@ namespace Microsoft.Mixer
             {
                 _participantsWhoTriggeredGiveInput.Add(inputEvent.ControlID, new _InternalParticipantTrackingState(participant));
             }
+            else 
+            {
+                var state = _participantsWhoTriggeredGiveInput[inputEvent.ControlID];
+                state.UpdateState(participant);
+                _participantsWhoTriggeredGiveInput[inputEvent.ControlID] = state;
+            }
+
             participant.LastInputAt = DateTime.UtcNow;
             if (inputEvent.Type == InteractiveEventType.Button)
             {
@@ -4466,11 +4473,22 @@ namespace Microsoft.Mixer
         internal InteractiveParticipant previousParticpant;
         internal InteractiveParticipant particpant;
         internal InteractiveParticipant nextParticpant;
+
         public _InternalParticipantTrackingState(InteractiveParticipant newParticipant)
         {
             nextParticpant = newParticipant;
             particpant = null;
             previousParticpant = null;
+        }
+
+        public void UpdateState(InteractiveParticipant newParticipant)
+        {
+            nextParticpant = newParticipant;
+        }
+
+        public override string ToString()
+        {
+            return string.Format("({0}) | ({1}) | ({2})", previousParticpant, particpant, nextParticpant);
         }
     }
 
