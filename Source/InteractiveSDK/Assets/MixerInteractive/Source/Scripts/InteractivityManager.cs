@@ -2989,7 +2989,7 @@ namespace Microsoft.Mixer
         {
             double joystickX = 0;
             _InternalJoystickState joystickState;
-            if (string.IsNullOrEmpty(sessionID) && 
+            if (!string.IsNullOrEmpty(sessionID) && 
                 TryGetJoystickStateByParticipant(sessionID, controlID, out joystickState))
             {
                 joystickX = joystickState.X;
