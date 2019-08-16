@@ -2241,6 +2241,7 @@ namespace Microsoft.Mixer
             int startDepth = jsonReader.Depth;
             string controlID = string.Empty;
             uint cost = 0;
+            float progress = 0;
             bool disabled = false;
             string text = string.Empty;
             string eTag = string.Empty;
@@ -2279,6 +2280,10 @@ namespace Microsoft.Mixer
                                 jsonReader.ReadAsInt32();
                                 cost = Convert.ToUInt32(jsonReader.Value);
                                 break;
+                            case _WS_MESSAGE_KEY_PROGRESS:
+                                jsonReader.ReadAsDecimal();
+                                progress = Convert.ToSingle(jsonReader.Value);
+                                break;
                             case WS_MESSAGE_KEY_META:
                                 while (jsonReader.Read())
                                 {
@@ -2302,7 +2307,7 @@ namespace Microsoft.Mixer
             }
             if (kind == _WS_MESSAGE_VALUE_CONTROL_TYPE_BUTTON)
             {
-                newControl = new InteractiveButtonControl(controlID, InteractiveEventType.Button, disabled, text, cost, eTag, sceneID, metaProperties);
+                newControl = new InteractiveButtonControl(controlID, InteractiveEventType.Button, disabled, text, cost, progress, eTag, sceneID, metaProperties);
             }
             else if (kind == _WS_MESSAGE_VALUE_CONTROL_TYPE_JOYSTICK)
             {
@@ -3082,7 +3087,7 @@ namespace Microsoft.Mixer
         /// <returns></returns>
         public InteractiveButtonControl GetButton(string controlID)
         {
-            InteractiveButtonControl buttonControl = new InteractiveButtonControl(controlID, InteractiveEventType.Button, false, string.Empty, 0, string.Empty, string.Empty, new Dictionary<string, object>());
+            InteractiveButtonControl buttonControl = new InteractiveButtonControl(controlID, InteractiveEventType.Button, false, string.Empty, 0, 0, string.Empty, string.Empty, new Dictionary<string, object>());
             var buttons = Buttons;
             foreach (InteractiveButtonControl currentButtonControl in buttons)
             {

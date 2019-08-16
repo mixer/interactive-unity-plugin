@@ -362,10 +362,11 @@ namespace Microsoft.Mixer
         }
 
         internal Int64 _cooldownExpirationTime;
-        public InteractiveButtonControl(string controlID, InteractiveEventType type, bool disabled, string helpText, uint cost, string eTag, string sceneID, Dictionary<string, object> metaproperties) : 
+        public InteractiveButtonControl(string controlID, InteractiveEventType type, bool disabled, string helpText, uint cost, float progress, string eTag, string sceneID, Dictionary<string, object> metaproperties) : 
             base(controlID, InteractivityManager._CONTROL_TYPE_BUTTON, type, disabled, helpText, eTag, sceneID, metaproperties)
         {
             Cost = cost;
+            Progress = progress;
         }
     }
 }
