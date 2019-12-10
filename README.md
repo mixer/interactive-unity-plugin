@@ -1,3 +1,8 @@
+# NOTE: This repo is no longer being maintained by Microsoft.
+You can find more information here: https://dev.mixer.com/blog/mixplaysdkchanges
+
+--------------
+
 ## Welcome!
 
 The Mixer Unity plugin helps you add features to your game that let the audience interact with people streaming your game!
